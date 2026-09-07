@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../prisma/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  SKIPPED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  role         Role      @default(USER)
+  fullName     String?
+  designation  String?
+  department   String?
+  email        String?
+  mobileNumber String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  groups  Group[]
+  courses Course[]
+}
+
+model Group {
+  id          String    @id @default(cuid())
+  name        String
+  detail      String?
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  isArchived  Boolean   @default(false)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  students     Student[]
+  courseGroups CourseGroup[]
+}
+
+model Student {
+  id         String    @id @default(cuid())
+  groupId    String
+  group      Group     @relation(fields: [groupId], references: [id])
+  name       String
+  rollNumber String
+  fatherName String?
+  image      String?
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  attendanceRecords AttendanceRecord[]
+}
+
+model Course {
+  id          String    @id @default(cuid())
+  name        String
+  code        String?
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  isArchived  Boolean   @default(false)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  courseGroups CourseGroup[]
+  sessions     AttendanceSession[]
+}
+
+model CourseGroup {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([courseId, groupId])
+}
+
+model AttendanceSession {
+  id        String        @id @default(cuid())
+  courseId  String
+  course    Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  date      DateTime
+  note      String?
+  status    SessionStatus @default(IN_PROGRESS)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  records AttendanceRecord[]
+}
+
+model AttendanceRecord {
+  id        String           @id @default(cuid())
+  sessionId String
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student          @relation(fields: [studentId], references: [id])
+  status    AttendanceStatus @default(SKIPPED)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([sessionId, studentId])
+}
