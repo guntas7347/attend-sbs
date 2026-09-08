@@ -39,10 +39,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  managedUsers   User[]          @relation("TeacherManagers")
-  groups         Group[]
-  courses        Course[]
-  courseManagers CourseManager[]
+  managedUsers    User[]              @relation("TeacherManagers")
+  groups          Group[]
+  courses         Course[]
+  courseManagers  CourseManager[]
+  createdSessions AttendanceSession[]
 }
 
 model Group {
@@ -115,14 +116,16 @@ model CourseManager {
 }
 
 model AttendanceSession {
-  id        String        @id @default(cuid())
-  courseId  String
-  course    Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  date      DateTime
-  note      String?
-  status    SessionStatus @default(IN_PROGRESS)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id          String        @id @default(cuid())
+  courseId    String
+  course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  date        DateTime
+  note        String?
+  status      SessionStatus @default(IN_PROGRESS)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   records AttendanceRecord[]
 }

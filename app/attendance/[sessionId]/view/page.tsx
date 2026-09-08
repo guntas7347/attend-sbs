@@ -35,6 +35,7 @@ export default function AttendanceViewSessionPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isManager, setIsManager] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -48,6 +49,7 @@ export default function AttendanceViewSessionPage({
           setSession(res.session);
           setRecords(res.records || []);
           setIsManager(res.isManager || false);
+          setCanEdit(res.canEdit || false);
         } else {
           setError(res.error || "Session not found");
         }
@@ -230,7 +232,7 @@ export default function AttendanceViewSessionPage({
               )}
             </button>
 
-            {!isManager && (
+            {canEdit && (
               <Link
                 href={`/attendance/${sessionId}/review`}
                 className="flex h-10 px-4 items-center justify-center gap-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-semibold hover:opacity-95 active:scale-[0.98] transition-all shadow-xs"
@@ -240,6 +242,11 @@ export default function AttendanceViewSessionPage({
               </Link>
             )}
           </div>
+          {isManager && canEdit && session?.status === "COMPLETED" && (
+            <p className="text-[11px] text-muted-foreground pt-0.5 px-0.5">
+              Editable for up to 1 hour after creation.
+            </p>
+          )}
         </div>
 
         {/* Student Records List */}

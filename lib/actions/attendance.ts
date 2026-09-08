@@ -17,6 +17,50 @@ function isDateWithin2Days(targetDate: Date | string): boolean {
   return t >= minDate.getTime() && t <= maxDate.getTime();
 }
 
+function isWithinOneHourOfCreation(createdAt: Date | string): boolean {
+  const createdTime = new Date(createdAt).getTime();
+  const oneHourMs = 60 * 60 * 1000;
+  return Date.now() - createdTime <= oneHourMs;
+}
+
+/**
+ * Check if the user is permitted to edit an attendance session.
+ * - Teachers / Admins: Always allowed
+ * - Managers: In-progress within 2 days, or if completed: only if created by logged in CR and within 1 hour of creation.
+ */
+function canUserEditSession(
+  session: { status: string; date: Date; createdAt: Date; createdById: string | null },
+  sessionUser: SessionUser
+): { allowed: boolean; error?: string } {
+  if (sessionUser.role !== "MANAGER") {
+    return { allowed: true };
+  }
+
+  if (!isDateWithin2Days(session.date)) {
+    return {
+      allowed: false,
+      error: "Attendance sessions older than 2 days cannot be modified.",
+    };
+  }
+
+  if (session.status === "COMPLETED") {
+    if (session.createdById !== sessionUser.userId) {
+      return {
+        allowed: false,
+        error: "You can only edit attendance created by you.",
+      };
+    }
+    if (!isWithinOneHourOfCreation(session.createdAt)) {
+      return {
+        allowed: false,
+        error: "Completed attendance can only be edited within 1 hour of creation.",
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
 /**
  * Verify user has permission to access a course.
  */
@@ -120,6 +164,7 @@ export async function getOrCreateSessionAction(
           date: targetDate,
           note: note?.trim() || null,
           status: "IN_PROGRESS",
+          createdById: sessionUser.userId,
         },
       });
     }
@@ -213,14 +258,10 @@ export async function getSessionDetailsAction(sessionId: string) {
       return { success: false, error: "Unauthorized: Course not assigned to you" };
     }
 
-    // Check manager 2-day restriction
-    if (sessionUser.role === "MANAGER") {
-      if (!isDateWithin2Days(session.date)) {
-        return {
-          success: false,
-          error: "Access denied: Attendance sessions older than 2 days are not accessible to managers",
-        };
-      }
+    // Check if user is allowed to view/edit this session
+    const editCheck = canUserEditSession(session, sessionUser);
+    if (!editCheck.allowed) {
+      return { success: false, error: editCheck.error || "Access denied" };
     }
 
     const records = session.records.map((r) => ({
@@ -271,26 +312,16 @@ export async function saveAttendanceRecordAction(
       return { success: false, error: "Attendance session not found" };
     }
 
-    // Check access
+    // Check course access
     const hasAccess = await verifyCourseAccess(session.courseId, sessionUser);
     if (!hasAccess) {
       return { success: false, error: "Unauthorized: Course not assigned to you" };
     }
 
-    // Check manager restrictions
-    if (sessionUser.role === "MANAGER") {
-      if (!isDateWithin2Days(session.date)) {
-        return {
-          success: false,
-          error: "Managers cannot edit attendance older than 2 days",
-        };
-      }
-      if (session.status === "COMPLETED") {
-        return {
-          success: false,
-          error: "Managers cannot edit completed attendance sessions",
-        };
-      }
+    // Check if user is allowed to edit this session
+    const editCheck = canUserEditSession(session, sessionUser);
+    if (!editCheck.allowed) {
+      return { success: false, error: editCheck.error || "Access denied" };
     }
 
     await prisma.attendanceRecord.upsert({
@@ -329,20 +360,16 @@ export async function completeAttendanceSessionAction(sessionId: string) {
       return { success: false, error: "Attendance session not found" };
     }
 
-    // Check access
+    // Check course access
     const hasAccess = await verifyCourseAccess(session.courseId, sessionUser);
     if (!hasAccess) {
       return { success: false, error: "Unauthorized: Course not assigned to you" };
     }
 
-    // Check manager 2-day restriction
-    if (sessionUser.role === "MANAGER") {
-      if (!isDateWithin2Days(session.date)) {
-        return {
-          success: false,
-          error: "Managers cannot complete attendance sessions older than 2 days",
-        };
-      }
+    // Check if user is allowed to complete/edit this session
+    const editCheck = canUserEditSession(session, sessionUser);
+    if (!editCheck.allowed) {
+      return { success: false, error: editCheck.error || "Access denied" };
     }
 
     const updated = await prisma.attendanceSession.update({
@@ -417,6 +444,8 @@ export async function getSessionViewAction(sessionId: string) {
     const absent = session.records.filter((r) => r.status === "ABSENT").length;
     const skipped = session.records.filter((r) => r.status === "SKIPPED").length;
 
+    const canEdit = canUserEditSession(session, sessionUser).allowed;
+
     return {
       success: true,
       session: {
@@ -427,6 +456,8 @@ export async function getSessionViewAction(sessionId: string) {
         date: session.date,
         note: session.note,
         status: session.status,
+        createdAt: session.createdAt,
+        createdById: session.createdById,
         total,
         present,
         absent,
@@ -442,6 +473,8 @@ export async function getSessionViewAction(sessionId: string) {
         status: r.status,
       })),
       isManager: sessionUser.role === "MANAGER",
+      canEdit,
+      isCreatedBySelf: session.createdById === sessionUser.userId,
     };
   } catch (err: any) {
     console.error("Get session view error:", err);

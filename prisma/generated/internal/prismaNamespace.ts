@@ -1140,6 +1140,7 @@ export type CourseManagerScalarFieldEnum = (typeof CourseManagerScalarFieldEnum)
 export const AttendanceSessionScalarFieldEnum = {
   id: 'id',
   courseId: 'courseId',
+  createdById: 'createdById',
   date: 'date',
   note: 'note',
   status: 'status',

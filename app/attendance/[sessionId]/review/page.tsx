@@ -146,7 +146,7 @@ export default function AttendanceReviewPage({
       <TopHeader
         title="Review Attendance"
         subtitle={session?.courseName}
-        backHref={`/attendance/${sessionId}`}
+        backHref={session?.status === "COMPLETED" ? `/attendance/${sessionId}/view` : `/attendance/${sessionId}`}
       />
 
       <div className="flex-1 p-4 space-y-4 pb-28">
