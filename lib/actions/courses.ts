@@ -4,13 +4,13 @@ import { prisma } from "../prisma";
 import { getSessionUser, requireUser } from "../auth";
 import { revalidatePath } from "next/cache";
 
-export async function getCoursesAction() {
+export async function getCoursesAction(includeArchived: boolean = false) {
   const session = await getSessionUser();
   if (!session) {
     return { success: false, error: "UNAUTHORIZED", courses: [] };
   }
 
-  // If user is a MANAGER, find courses explicitly assigned to this manager
+  // If user is a MANAGER, find courses explicitly assigned to this manager (never archived)
   if (session.role === "MANAGER") {
     const courses = await prisma.course.findMany({
       where: {
@@ -65,13 +65,13 @@ export async function getCoursesAction() {
       };
     });
 
-    return { success: true, courses: coursesWithStudentCounts, role: "MANAGER" };
+    return { success: true, courses: coursesWithStudentCounts, role: "MANAGER", archivedCount: 0 };
   }
 
   // For TEACHER (USER) or ADMIN
   const courses = await prisma.course.findMany({
     where: {
-      isArchived: false,
+      ...(includeArchived ? {} : { isArchived: false }),
       ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
     },
     include: {
@@ -114,6 +114,13 @@ export async function getCoursesAction() {
     orderBy: { createdAt: "desc" },
   });
 
+  const archivedCount = await prisma.course.count({
+    where: {
+      isArchived: true,
+      ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
+    },
+  });
+
   // Calculate total active students across groups for each course
   const coursesWithStudentCounts = courses.map((course) => {
     const totalStudents = course.courseGroups.reduce(
@@ -134,7 +141,12 @@ export async function getCoursesAction() {
     };
   });
 
-  return { success: true, courses: coursesWithStudentCounts, role: session.role };
+  return {
+    success: true,
+    courses: coursesWithStudentCounts,
+    role: session.role,
+    archivedCount,
+  };
 }
 
 export async function getCourseByIdAction(id: string) {
@@ -194,7 +206,6 @@ export async function getCourseByIdAction(id: string) {
   const course = await prisma.course.findFirst({
     where: {
       id,
-      isArchived: false,
       ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
     },
     include: {
@@ -225,7 +236,7 @@ export async function getCourseByIdAction(id: string) {
   });
 
   if (!course) {
-    return { success: false, error: "Course not found or archived" };
+    return { success: false, error: "Course not found" };
   }
 
   // Aggregate all active students across assigned groups
@@ -257,6 +268,7 @@ export async function getCourseByIdAction(id: string) {
 export async function createCourseAction(data: {
   name: string;
   code?: string;
+  tags?: string[];
   groupIds: string[];
   managerIds?: string[];
 }) {
@@ -267,6 +279,10 @@ export async function createCourseAction(data: {
 
   const name = data.name?.trim();
   const code = data.code?.trim() || null;
+  const rawTags = data.tags || [];
+  const tags = Array.from(
+    new Set(rawTags.map((t) => t.trim()).filter(Boolean))
+  );
   const groupIds = data.groupIds || [];
   const managerIds = data.managerIds || [];
 
@@ -283,6 +299,7 @@ export async function createCourseAction(data: {
       data: {
         name,
         code,
+        tags,
         createdById: session.userId,
         courseGroups: {
           create: groupIds.map((groupId) => ({
@@ -310,6 +327,7 @@ export async function updateCourseAction(
   data: {
     name: string;
     code?: string;
+    tags?: string[];
     groupIds: string[];
     managerIds?: string[];
   }
@@ -321,6 +339,10 @@ export async function updateCourseAction(
 
   const name = data.name?.trim();
   const code = data.code?.trim() || null;
+  const rawTags = data.tags || [];
+  const tags = Array.from(
+    new Set(rawTags.map((t) => t.trim()).filter(Boolean))
+  );
   const groupIds = data.groupIds || [];
   const managerIds = data.managerIds || [];
 
@@ -336,7 +358,6 @@ export async function updateCourseAction(
     const course = await prisma.course.findFirst({
       where: {
         id: courseId,
-        isArchived: false,
         ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
       },
     });
@@ -352,7 +373,7 @@ export async function updateCourseAction(
     await prisma.$transaction(async (tx) => {
       await tx.course.update({
         where: { id: courseId },
-        data: { name, code },
+        data: { name, code, tags },
       });
 
       // Remove existing courseGroup relationships
@@ -389,6 +410,76 @@ export async function updateCourseAction(
   } catch (err: any) {
     console.error("Update course error:", err);
     return { success: false, error: "Failed to update course" };
+  }
+}
+
+export async function archiveCourseAction(courseId: string) {
+  const session = await requireUser();
+  if (session.role === "MANAGER") {
+    return { success: false, error: "Managers cannot archive courses" };
+  }
+
+  try {
+    const course = await prisma.course.findFirst({
+      where: {
+        id: courseId,
+        ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
+      },
+    });
+
+    if (!course) {
+      return { success: false, error: "Course not found or unauthorized" };
+    }
+
+    await prisma.course.update({
+      where: { id: courseId },
+      data: {
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/courses");
+    revalidatePath(`/courses/${courseId}`);
+    return { success: true, message: "Course archived successfully." };
+  } catch (err: any) {
+    console.error("Archive course error:", err);
+    return { success: false, error: "Failed to archive course" };
+  }
+}
+
+export async function unarchiveCourseAction(courseId: string) {
+  const session = await requireUser();
+  if (session.role === "MANAGER") {
+    return { success: false, error: "Managers cannot unarchive courses" };
+  }
+
+  try {
+    const course = await prisma.course.findFirst({
+      where: {
+        id: courseId,
+        ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
+      },
+    });
+
+    if (!course) {
+      return { success: false, error: "Course not found or unauthorized" };
+    }
+
+    await prisma.course.update({
+      where: { id: courseId },
+      data: {
+        isArchived: false,
+        archivedAt: null,
+      },
+    });
+
+    revalidatePath("/courses");
+    revalidatePath(`/courses/${courseId}`);
+    return { success: true, message: "Course unarchived successfully." };
+  } catch (err: any) {
+    console.error("Unarchive course error:", err);
+    return { success: false, error: "Failed to unarchive course" };
   }
 }
 
@@ -655,6 +746,20 @@ export async function getCourseAttendanceReportAction(
       orderBy: { date: "asc" },
     });
 
+    // Format sessions list for date-wise column headers
+    const sessionList = sessions.map((s) => {
+      const d = new Date(s.date);
+      const formattedDate = `${d.getDate()}/${d.getMonth() + 1}`;
+      const fullDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+      return {
+        id: s.id,
+        date: s.date,
+        formattedDate,
+        fullDate,
+        note: s.note,
+      };
+    });
+
     // Total lectures/sessions conducted in this period
     const totalLectures = sessions.length;
 
@@ -672,6 +777,7 @@ export async function getCourseAttendanceReportAction(
         skipped: number;
         totalLectures: number;
         percentage: number;
+        attendanceBySession: Record<string, "PRESENT" | "ABSENT" | "SKIPPED">;
       }
     >();
 
@@ -688,6 +794,7 @@ export async function getCourseAttendanceReportAction(
           skipped: 0,
           totalLectures,
           percentage: 0,
+          attendanceBySession: {},
         });
       }
     }
@@ -707,11 +814,13 @@ export async function getCourseAttendanceReportAction(
             skipped: 0,
             totalLectures,
             percentage: 0,
+            attendanceBySession: {},
           });
         }
 
         const student = studentsMap.get(rec.studentId);
         if (student) {
+          student.attendanceBySession[s.id] = rec.status;
           if (rec.status === "PRESENT") {
             student.presents += 1;
           } else if (rec.status === "ABSENT") {
@@ -763,6 +872,7 @@ export async function getCourseAttendanceReportAction(
         fromDate: fromDate || null,
         toDate: toDate || null,
       },
+      sessions: sessionList,
       students: reportStudents,
     };
   } catch (err: any) {

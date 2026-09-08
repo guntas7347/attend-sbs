@@ -50,6 +50,7 @@ export type CourseCountAggregateOutputType = {
   id: number
   name: number
   code: number
+  tags: number
   createdById: number
   isArchived: number
   archivedAt: number
@@ -85,6 +86,7 @@ export type CourseCountAggregateInputType = {
   id?: true
   name?: true
   code?: true
+  tags?: true
   createdById?: true
   isArchived?: true
   archivedAt?: true
@@ -169,6 +171,7 @@ export type CourseGroupByOutputType = {
   id: string
   name: string
   code: string | null
+  tags: string[]
   createdById: string
   isArchived: boolean
   archivedAt: Date | null
@@ -201,6 +204,7 @@ export type CourseWhereInput = {
   id?: Prisma.StringFilter<"Course"> | string
   name?: Prisma.StringFilter<"Course"> | string
   code?: Prisma.StringNullableFilter<"Course"> | string | null
+  tags?: Prisma.StringNullableListFilter<"Course">
   createdById?: Prisma.StringFilter<"Course"> | string
   isArchived?: Prisma.BoolFilter<"Course"> | boolean
   archivedAt?: Prisma.DateTimeNullableFilter<"Course"> | Date | string | null
@@ -216,6 +220,7 @@ export type CourseOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   code?: Prisma.SortOrderInput | Prisma.SortOrder
+  tags?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   isArchived?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -234,6 +239,7 @@ export type CourseWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.CourseWhereInput | Prisma.CourseWhereInput[]
   name?: Prisma.StringFilter<"Course"> | string
   code?: Prisma.StringNullableFilter<"Course"> | string | null
+  tags?: Prisma.StringNullableListFilter<"Course">
   createdById?: Prisma.StringFilter<"Course"> | string
   isArchived?: Prisma.BoolFilter<"Course"> | boolean
   archivedAt?: Prisma.DateTimeNullableFilter<"Course"> | Date | string | null
@@ -249,6 +255,7 @@ export type CourseOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   code?: Prisma.SortOrderInput | Prisma.SortOrder
+  tags?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   isArchived?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -266,6 +273,7 @@ export type CourseScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"Course"> | string
   name?: Prisma.StringWithAggregatesFilter<"Course"> | string
   code?: Prisma.StringNullableWithAggregatesFilter<"Course"> | string | null
+  tags?: Prisma.StringNullableListFilter<"Course">
   createdById?: Prisma.StringWithAggregatesFilter<"Course"> | string
   isArchived?: Prisma.BoolWithAggregatesFilter<"Course"> | boolean
   archivedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Course"> | Date | string | null
@@ -277,6 +285,7 @@ export type CourseCreateInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   isArchived?: boolean
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -291,6 +300,7 @@ export type CourseUncheckedCreateInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   createdById: string
   isArchived?: boolean
   archivedAt?: Date | string | null
@@ -305,6 +315,7 @@ export type CourseUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -319,6 +330,7 @@ export type CourseUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -333,6 +345,7 @@ export type CourseCreateManyInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   createdById: string
   isArchived?: boolean
   archivedAt?: Date | string | null
@@ -344,6 +357,7 @@ export type CourseUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -354,6 +368,7 @@ export type CourseUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -371,10 +386,19 @@ export type CourseOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type StringNullableListFilter<$PrismaModel = never> = {
+  equals?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel> | null
+  has?: string | Prisma.StringFieldRefInput<$PrismaModel> | null
+  hasEvery?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  hasSome?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  isEmpty?: boolean
+}
+
 export type CourseCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   code?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   isArchived?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrder
@@ -451,6 +475,15 @@ export type CourseUncheckedUpdateManyWithoutCreatedByNestedInput = {
   deleteMany?: Prisma.CourseScalarWhereInput | Prisma.CourseScalarWhereInput[]
 }
 
+export type CourseCreatetagsInput = {
+  set: string[]
+}
+
+export type CourseUpdatetagsInput = {
+  set?: string[]
+  push?: string | string[]
+}
+
 export type CourseCreateNestedOneWithoutCourseGroupsInput = {
   create?: Prisma.XOR<Prisma.CourseCreateWithoutCourseGroupsInput, Prisma.CourseUncheckedCreateWithoutCourseGroupsInput>
   connectOrCreate?: Prisma.CourseCreateOrConnectWithoutCourseGroupsInput
@@ -497,6 +530,7 @@ export type CourseCreateWithoutCreatedByInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   isArchived?: boolean
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -510,6 +544,7 @@ export type CourseUncheckedCreateWithoutCreatedByInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   isArchived?: boolean
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -552,6 +587,7 @@ export type CourseScalarWhereInput = {
   id?: Prisma.StringFilter<"Course"> | string
   name?: Prisma.StringFilter<"Course"> | string
   code?: Prisma.StringNullableFilter<"Course"> | string | null
+  tags?: Prisma.StringNullableListFilter<"Course">
   createdById?: Prisma.StringFilter<"Course"> | string
   isArchived?: Prisma.BoolFilter<"Course"> | boolean
   archivedAt?: Prisma.DateTimeNullableFilter<"Course"> | Date | string | null
@@ -563,6 +599,7 @@ export type CourseCreateWithoutCourseGroupsInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   isArchived?: boolean
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -576,6 +613,7 @@ export type CourseUncheckedCreateWithoutCourseGroupsInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   createdById: string
   isArchived?: boolean
   archivedAt?: Date | string | null
@@ -605,6 +643,7 @@ export type CourseUpdateWithoutCourseGroupsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -618,6 +657,7 @@ export type CourseUncheckedUpdateWithoutCourseGroupsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -631,6 +671,7 @@ export type CourseCreateWithoutCourseManagersInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   isArchived?: boolean
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -644,6 +685,7 @@ export type CourseUncheckedCreateWithoutCourseManagersInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   createdById: string
   isArchived?: boolean
   archivedAt?: Date | string | null
@@ -673,6 +715,7 @@ export type CourseUpdateWithoutCourseManagersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -686,6 +729,7 @@ export type CourseUncheckedUpdateWithoutCourseManagersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -699,6 +743,7 @@ export type CourseCreateWithoutSessionsInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   isArchived?: boolean
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -712,6 +757,7 @@ export type CourseUncheckedCreateWithoutSessionsInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   createdById: string
   isArchived?: boolean
   archivedAt?: Date | string | null
@@ -741,6 +787,7 @@ export type CourseUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -754,6 +801,7 @@ export type CourseUncheckedUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -767,6 +815,7 @@ export type CourseCreateManyCreatedByInput = {
   id?: string
   name: string
   code?: string | null
+  tags?: Prisma.CourseCreatetagsInput | string[]
   isArchived?: boolean
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -777,6 +826,7 @@ export type CourseUpdateWithoutCreatedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -790,6 +840,7 @@ export type CourseUncheckedUpdateWithoutCreatedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -803,6 +854,7 @@ export type CourseUncheckedUpdateManyWithoutCreatedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.CourseUpdatetagsInput | string[]
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -862,6 +914,7 @@ export type CourseSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   id?: boolean
   name?: boolean
   code?: boolean
+  tags?: boolean
   createdById?: boolean
   isArchived?: boolean
   archivedAt?: boolean
@@ -878,6 +931,7 @@ export type CourseSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   id?: boolean
   name?: boolean
   code?: boolean
+  tags?: boolean
   createdById?: boolean
   isArchived?: boolean
   archivedAt?: boolean
@@ -890,6 +944,7 @@ export type CourseSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   id?: boolean
   name?: boolean
   code?: boolean
+  tags?: boolean
   createdById?: boolean
   isArchived?: boolean
   archivedAt?: boolean
@@ -902,6 +957,7 @@ export type CourseSelectScalar = {
   id?: boolean
   name?: boolean
   code?: boolean
+  tags?: boolean
   createdById?: boolean
   isArchived?: boolean
   archivedAt?: boolean
@@ -909,7 +965,7 @@ export type CourseSelectScalar = {
   updatedAt?: boolean
 }
 
-export type CourseOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "code" | "createdById" | "isArchived" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["course"]>
+export type CourseOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "code" | "tags" | "createdById" | "isArchived" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["course"]>
 export type CourseInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   courseGroups?: boolean | Prisma.Course$courseGroupsArgs<ExtArgs>
@@ -936,6 +992,7 @@ export type $CoursePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     id: string
     name: string
     code: string | null
+    tags: string[]
     createdById: string
     isArchived: boolean
     archivedAt: Date | null
@@ -1371,6 +1428,7 @@ export interface CourseFieldRefs {
   readonly id: Prisma.FieldRef<"Course", 'String'>
   readonly name: Prisma.FieldRef<"Course", 'String'>
   readonly code: Prisma.FieldRef<"Course", 'String'>
+  readonly tags: Prisma.FieldRef<"Course", 'String[]'>
   readonly createdById: Prisma.FieldRef<"Course", 'String'>
   readonly isArchived: Prisma.FieldRef<"Course", 'Boolean'>
   readonly archivedAt: Prisma.FieldRef<"Course", 'DateTime'>

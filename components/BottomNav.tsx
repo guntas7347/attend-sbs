@@ -1,30 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Users, Settings } from "lucide-react";
-import { getCurrentUserAction } from "@/lib/actions/auth";
 
-export default function BottomNav() {
+export default function BottomNav({ initialRole }: { initialRole?: string }) {
   const pathname = usePathname();
-  const [role, setRole] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function checkRole() {
-      try {
-        const user = await getCurrentUserAction();
-        if (user) {
-          setRole(user.role);
-        }
-      } catch {
-        // Ignore
-      }
-    }
-    checkRole();
-  }, [pathname]);
-
-  // Hide bottom nav on attendance marking page to maximize focus & screen area
+  // Hide bottom nav on attendance marking/reviewing pages to maximize focus & screen area
   if (pathname.startsWith("/attendance/")) {
     return null;
   }
@@ -35,7 +18,7 @@ export default function BottomNav() {
   }
 
   // Managers have an ultra-minimal single-purpose UI (My Courses only), so hide bottom nav
-  if (role === "MANAGER") {
+  if (initialRole === "MANAGER") {
     return null;
   }
 

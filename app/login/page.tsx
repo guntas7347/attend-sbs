@@ -128,19 +128,9 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full h-12 flex items-center justify-center rounded-xl bg-accent text-accent-foreground font-semibold text-sm hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-50 mt-2 shadow-sm"
           >
-            {loading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              "Sign In"
-            )}
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign In"}
           </button>
         </form>
-
-        <div className="p-3 bg-secondary/60 rounded-xl border border-border/50 text-center">
-          <p className="text-xs text-muted-foreground">
-            Default credentials: <span className="font-mono text-foreground font-medium">admin / admin123</span>
-          </p>
-        </div>
       </div>
 
       {/* Footer info */}

@@ -1107,6 +1107,7 @@ export const CourseScalarFieldEnum = {
   id: 'id',
   name: 'name',
   code: 'code',
+  tags: 'tags',
   createdById: 'createdById',
   isArchived: 'isArchived',
   archivedAt: 'archivedAt',

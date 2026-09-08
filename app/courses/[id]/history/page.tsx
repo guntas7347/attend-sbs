@@ -45,6 +45,7 @@ export default function CourseHistoryPage({
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [searchStudent, setSearchStudent] = useState("");
+  const [reportViewMode, setReportViewMode] = useState<"byDate" | "summary">("byDate");
   const [reportData, setReportData] = useState<{
     summary: {
       totalLectures: number;
@@ -53,6 +54,13 @@ export default function CourseHistoryPage({
       fromDate: string | null;
       toDate: string | null;
     };
+    sessions: Array<{
+      id: string;
+      date: Date | string;
+      formattedDate: string;
+      fullDate: string;
+      note: string | null;
+    }>;
     students: Array<{
       id: string;
       name: string;
@@ -64,6 +72,7 @@ export default function CourseHistoryPage({
       skipped: number;
       totalLectures: number;
       percentage: number;
+      attendanceBySession?: Record<string, "PRESENT" | "ABSENT" | "SKIPPED">;
     }>;
   } | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
@@ -111,6 +120,7 @@ export default function CourseHistoryPage({
           }
           setReportData({
             summary: res.summary!,
+            sessions: res.sessions || [],
             students: res.students || [],
           });
         }
@@ -121,7 +131,7 @@ export default function CourseHistoryPage({
       }
     }
     loadReport();
-  }, [courseId, activeTab, fromDate, toDate]);
+  }, [courseId, activeTab, fromDate, toDate, isManager]);
 
   function formatDate(d: string | Date) {
     const dateObj = new Date(d);
@@ -148,6 +158,70 @@ export default function CourseHistoryPage({
 
   function downloadCsv() {
     if (!reportData || reportData.students.length === 0) return;
+
+    if (reportViewMode === "byDate" && reportData.sessions.length > 0) {
+      const sessionHeaders = reportData.sessions.map(
+        (s) => `"${s.fullDate}${s.note ? ` (${s.note.replace(/"/g, '""')})` : ""}"`
+      );
+
+      const headers = [
+        "Roll Number",
+        "Student Name",
+        "Father Name",
+        "Group",
+        ...sessionHeaders,
+        "Total Lectures",
+        "Presents",
+        "Absents",
+        "Skipped",
+        "Attendance %",
+      ];
+
+      const rows = reportData.students.map((s) => {
+        const sessionMarks = reportData.sessions.map((sess) => {
+          const st = s.attendanceBySession?.[sess.id];
+          if (st === "PRESENT") return "P";
+          if (st === "ABSENT") return "A";
+          if (st === "SKIPPED") return "S";
+          return "-";
+        });
+
+        return [
+          `"${s.rollNumber}"`,
+          `"${s.name.replace(/"/g, '""')}"`,
+          `"${(s.fatherName || "").replace(/"/g, '""')}"`,
+          `"${(s.groupName || "").replace(/"/g, '""')}"`,
+          ...sessionMarks,
+          s.totalLectures,
+          s.presents,
+          s.absents,
+          s.skipped,
+          `${s.percentage}%`,
+        ];
+      });
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.join(",")),
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const filename = `${course?.name || "course"}_datewise_report_${
+        fromDate || "all"
+      }_to_${toDate || "all"}.csv`
+        .toLowerCase()
+        .replace(/\s+/g, "_");
+
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
 
     const headers = [
       "Roll Number",
@@ -496,28 +570,59 @@ export default function CourseHistoryPage({
                   </div>
                 </div>
 
-                {/* Actions & Search */}
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search roll or student name..."
-                      value={searchStudent}
-                      onChange={(e) => setSearchStudent(e.target.value)}
-                      className="w-full h-10 rounded-xl border border-border bg-surface pl-10 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                {/* View Switcher & Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  {/* View Mode Toggle */}
+                  <div className="inline-flex items-center rounded-xl bg-secondary p-1 border border-border self-start">
+                    <button
+                      type="button"
+                      onClick={() => setReportViewMode("byDate")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        reportViewMode === "byDate"
+                          ? "bg-surface text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>By Date</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReportViewMode("summary")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        reportViewMode === "summary"
+                          ? "bg-surface text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5" />
+                      <span>Summary</span>
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={downloadCsv}
-                    disabled={reportData.students.length === 0}
-                    className="flex h-10 items-center justify-center gap-1.5 px-3 rounded-xl border border-border bg-secondary text-foreground text-xs font-semibold hover:bg-muted active:scale-95 transition-all disabled:opacity-50 shrink-0"
-                    title="Export CSV"
-                  >
-                    <Download className="h-4 w-4 text-accent" />
-                    <span className="hidden sm:inline">Export CSV</span>
-                  </button>
+
+                  {/* Search & Export CSV */}
+                  <div className="flex items-center gap-2 flex-1 sm:justify-end">
+                    <div className="relative flex-1 sm:max-w-xs">
+                      <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search roll or student name..."
+                        value={searchStudent}
+                        onChange={(e) => setSearchStudent(e.target.value)}
+                        className="w-full h-10 rounded-xl border border-border bg-surface pl-10 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={downloadCsv}
+                      disabled={reportData.students.length === 0}
+                      className="flex h-10 items-center justify-center gap-1.5 px-3.5 rounded-xl border border-border bg-secondary text-foreground text-xs font-semibold hover:bg-muted active:scale-95 transition-all disabled:opacity-50 shrink-0 shadow-xs"
+                      title="Export CSV"
+                    >
+                      <Download className="h-4 w-4 text-accent" />
+                      <span className="hidden sm:inline">Export CSV</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Report Table */}
@@ -538,7 +643,123 @@ export default function CourseHistoryPage({
                       No student found matching &quot;{searchStudent}&quot;
                     </p>
                   </div>
+                ) : reportViewMode === "byDate" ? (
+                  /* ================= DATE-WISE TABLE ================= */
+                  <div className="rounded-2xl border border-border bg-surface overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-border bg-secondary/50">
+                            <th className="py-3 px-3.5 font-bold text-muted-foreground uppercase tracking-wider text-[10px] sticky left-0 bg-secondary z-10 w-16">
+                              Roll
+                            </th>
+                            <th className="py-3 px-3.5 font-bold text-muted-foreground uppercase tracking-wider text-[10px] min-w-[140px]">
+                              Name
+                            </th>
+                            {reportData.sessions.map((sess) => (
+                              <th
+                                key={sess.id}
+                                className="py-2.5 px-2 font-bold text-muted-foreground uppercase tracking-wider text-[10px] text-center min-w-[56px] border-l border-border/40"
+                                title={`${sess.fullDate}${sess.note ? ` (${sess.note})` : ""}`}
+                              >
+                                <div className="text-[11px] font-bold text-foreground">
+                                  {sess.formattedDate}
+                                </div>
+                                {sess.note && (
+                                  <div className="text-[9px] font-normal text-muted-foreground truncate max-w-[52px] mx-auto">
+                                    {sess.note}
+                                  </div>
+                                )}
+                              </th>
+                            ))}
+                            <th className="py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider text-[10px] text-center min-w-[76px] border-l border-border">
+                              Attended
+                            </th>
+                            <th className="py-3 px-3.5 font-bold text-muted-foreground uppercase tracking-wider text-[10px] text-right min-w-[76px]">
+                              Percentage
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {filteredStudents.map((s) => (
+                            <tr
+                              key={s.id}
+                              className="hover:bg-muted/30 transition-colors"
+                            >
+                              <td className="py-2.5 px-3.5 font-mono font-bold text-accent sticky left-0 bg-surface z-10 border-r border-border/50">
+                                #{s.rollNumber}
+                              </td>
+                              <td className="py-2.5 px-3.5 min-w-[140px]">
+                                <div className="font-bold text-foreground text-xs">
+                                  {s.name}
+                                </div>
+                                {s.fatherName && (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    S/o {s.fatherName}
+                                  </div>
+                                )}
+                              </td>
+                              {reportData.sessions.map((sess) => {
+                                const status = s.attendanceBySession?.[sess.id];
+                                return (
+                                  <td
+                                    key={sess.id}
+                                    className="py-2.5 px-2 text-center border-l border-border/40"
+                                  >
+                                    {status === "PRESENT" ? (
+                                      <span
+                                        className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-success/15 text-success font-black text-[11px]"
+                                        title={`${sess.fullDate}: Present`}
+                                      >
+                                        P
+                                      </span>
+                                    ) : status === "ABSENT" ? (
+                                      <span
+                                        className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-danger/15 text-danger font-black text-[11px]"
+                                        title={`${sess.fullDate}: Absent`}
+                                      >
+                                        A
+                                      </span>
+                                    ) : status === "SKIPPED" ? (
+                                      <span
+                                        className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-secondary text-muted-foreground font-semibold text-[11px]"
+                                        title={`${sess.fullDate}: Skipped`}
+                                      >
+                                        S
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">-</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="py-2.5 px-3 text-center border-l border-border font-bold text-foreground">
+                                <span className="text-success">{s.presents}</span>
+                                <span className="text-muted-foreground font-normal text-[11px]">
+                                  {" "}/ {reportData.summary.totalLectures}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                                    s.percentage >= 75
+                                      ? "bg-success/15 text-success"
+                                      : s.percentage >= 60
+                                      ? "bg-amber-500/15 text-amber-500"
+                                      : "bg-danger/15 text-danger"
+                                  }`}
+                                >
+                                  {s.percentage}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 ) : (
+                  /* ================= SUMMARY TABLE ================= */
                   <div className="rounded-2xl border border-border bg-surface overflow-hidden shadow-xs">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse text-xs">

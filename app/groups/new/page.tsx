@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopHeader from "@/components/TopHeader";
 import { useForm } from "@/hooks/useForm";
-import { createGroupAction } from "@/lib/actions/groups";
-import { getCurrentUserAction } from "@/lib/actions/auth";
+import { createGroupAction, getGroupsAction } from "@/lib/actions/groups";
 import { Loader2 } from "lucide-react";
 
 export default function NewGroupPage() {
@@ -15,11 +14,13 @@ export default function NewGroupPage() {
 
   useEffect(() => {
     async function checkRole() {
-      const user = await getCurrentUserAction();
-      if (!user) {
-        router.replace("/login");
-      } else if (user.role === "MANAGER") {
-        router.replace("/courses");
+      const res = await getGroupsAction();
+      if (!res.success) {
+        if (res.error === "FORBIDDEN") {
+          router.replace("/courses");
+        } else if (res.error === "UNAUTHORIZED") {
+          router.replace("/login");
+        }
       }
     }
     checkRole();

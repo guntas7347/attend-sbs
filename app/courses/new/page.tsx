@@ -16,6 +16,8 @@ export default function NewCoursePage() {
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,20 @@ export default function NewCoursePage() {
     );
   }
 
+  function handleAddTag(e?: React.KeyboardEvent | React.MouseEvent) {
+    if (e && "key" in e && e.key !== "Enter" && e.key !== ",") return;
+    if (e) e.preventDefault();
+    const raw = tagInput.replace(/,/g, "").trim();
+    if (raw && !tags.includes(raw)) {
+      setTags([...tags, raw]);
+    }
+    setTagInput("");
+  }
+
+  function handleRemoveTag(tagToRemove: string) {
+    setTags(tags.filter((t) => t !== tagToRemove));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (selectedGroups.length === 0) {
@@ -83,6 +99,7 @@ export default function NewCoursePage() {
       const res = await createCourseAction({
         name: values.name,
         code: values.code,
+        tags,
         groupIds: selectedGroups,
         managerIds: selectedManagers,
       });
@@ -147,6 +164,57 @@ export default function NewCoursePage() {
               placeholder="e.g. CS301"
               className="w-full h-12 rounded-xl border border-border bg-surface px-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-all"
             />
+          </div>
+
+          {/* Tags Input */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="tagInput"
+              className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center justify-between"
+            >
+              <span>Course Tags <span className="text-muted-foreground font-normal">(Optional)</span></span>
+              <span className="text-[10px] text-muted-foreground font-normal">Press Enter or comma to add</span>
+            </label>
+            <div className="rounded-xl border border-border bg-surface p-2.5 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="tagInput"
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleAddTag}
+                  placeholder="Add tags e.g. 2023, Sem-IV, Morning Batch..."
+                  className="flex-1 bg-transparent px-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  disabled={!tagInput.trim()}
+                  className="px-3 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-semibold hover:bg-muted disabled:opacity-40 transition-all"
+                >
+                  Add
+                </button>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/40">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-md bg-accent/10 border border-accent/20 px-2.5 py-1 text-xs font-semibold text-accent"
+                    >
+                      #{tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="hover:text-danger text-accent/70 ml-0.5"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">

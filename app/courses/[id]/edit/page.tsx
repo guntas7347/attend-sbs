@@ -11,9 +11,11 @@ import {
   getCourseByIdAction,
   updateCourseAction,
   deleteCourseAction,
+  archiveCourseAction,
+  unarchiveCourseAction,
 } from "@/lib/actions/courses";
 import { getTeacherManagersAction } from "@/lib/actions/managers";
-import { Check, Loader2, Trash2, Users, UserCheck } from "lucide-react";
+import { Archive, Check, Loader2, RotateCcw, Trash2, Users, UserCheck } from "lucide-react";
 
 export default function EditCoursePage({
   params,
@@ -28,6 +30,8 @@ export default function EditCoursePage({
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +39,8 @@ export default function EditCoursePage({
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const { values, handleChange, setField } = useForm({
     name: "",
@@ -64,6 +70,7 @@ export default function EditCoursePage({
           setCourse(courseRes.course);
           setField("name", courseRes.course.name);
           setField("code", courseRes.course.code || "");
+          setTags(courseRes.course.tags || []);
           setIsOwner(courseRes.course.isOwner ?? false);
           setSelectedGroups(
             courseRes.course.courseGroups?.map((cg: any) => cg.groupId) || []
@@ -112,6 +119,22 @@ export default function EditCoursePage({
     );
   }
 
+  function handleAddTag(e?: React.KeyboardEvent | React.MouseEvent) {
+    if (!isOwner) return;
+    if (e && "key" in e && e.key !== "Enter" && e.key !== ",") return;
+    if (e) e.preventDefault();
+    const raw = tagInput.replace(/,/g, "").trim();
+    if (raw && !tags.includes(raw)) {
+      setTags([...tags, raw]);
+    }
+    setTagInput("");
+  }
+
+  function handleRemoveTag(tagToRemove: string) {
+    if (!isOwner) return;
+    setTags(tags.filter((t) => t !== tagToRemove));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isOwner) return;
@@ -128,6 +151,7 @@ export default function EditCoursePage({
       const res = await updateCourseAction(courseId, {
         name: values.name,
         code: values.code,
+        tags,
         groupIds: selectedGroups,
         managerIds: selectedManagers,
       });
@@ -142,6 +166,28 @@ export default function EditCoursePage({
       setError("An unexpected network error occurred");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleToggleArchive() {
+    setArchiving(true);
+    try {
+      const isArchived = course?.isArchived;
+      const res = isArchived
+        ? await unarchiveCourseAction(courseId)
+        : await archiveCourseAction(courseId);
+
+      if (res.success) {
+        setShowArchiveModal(false);
+        router.push("/courses");
+        router.refresh();
+      } else {
+        setError(res.error || "Failed to update course archive status");
+      }
+    } catch {
+      setError("An unexpected error occurred");
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -221,6 +267,60 @@ export default function EditCoursePage({
               onChange={handleChange}
               className="w-full h-12 rounded-xl border border-border bg-surface px-4 text-sm text-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-all disabled:opacity-50"
             />
+          </div>
+
+          {/* Tags Input */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="tagInput"
+              className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center justify-between"
+            >
+              <span>Course Tags <span className="text-muted-foreground font-normal">(Optional)</span></span>
+              <span className="text-[10px] text-muted-foreground font-normal">Press Enter or comma to add</span>
+            </label>
+            <div className="rounded-xl border border-border bg-surface p-2.5 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="tagInput"
+                  type="text"
+                  disabled={!isOwner}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleAddTag}
+                  placeholder="Add tags e.g. 2023, Sem-IV, Morning Batch..."
+                  className="flex-1 bg-transparent px-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  disabled={!isOwner || !tagInput.trim()}
+                  className="px-3 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-semibold hover:bg-muted disabled:opacity-40 transition-all"
+                >
+                  Add
+                </button>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/40">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-md bg-accent/10 border border-accent/20 px-2.5 py-1 text-xs font-semibold text-accent"
+                    >
+                      #{tag}
+                      {isOwner && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:text-danger text-accent/70 ml-0.5"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -391,14 +491,52 @@ export default function EditCoursePage({
         </form>
 
         {isOwner && (
-          <div className="pt-6 border-t border-border">
+          <div className="pt-6 border-t border-border space-y-4">
+            {/* Archive / Unarchive Card */}
+            <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+              <div>
+                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Archive className="h-3.5 w-3.5 text-accent" />
+                  {course?.isArchived ? "Course Archived" : "Archive Course (Completed)"}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {course?.isArchived
+                    ? "This course is archived and marked as completed. You can restore it anytime."
+                    : "If this course has finished its term/semester, archive it to keep your active dashboard clean while preserving all attendance history."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowArchiveModal(true)}
+                className={`w-full h-11 flex items-center justify-center gap-2 rounded-xl border text-xs font-bold active:scale-95 transition-all ${
+                  course?.isArchived
+                    ? "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+                    : "border-border bg-secondary text-foreground hover:bg-muted"
+                }`}
+              >
+                {course?.isArchived ? (
+                  <>
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Restore / Unarchive Course</span>
+                  </>
+                ) : (
+                  <>
+                    <Archive className="h-4 w-4 text-muted-foreground" />
+                    <span>Archive Course</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Danger Zone */}
             <div className="rounded-2xl border border-danger/20 bg-danger/5 p-4 space-y-3">
               <div>
                 <h3 className="text-xs font-bold text-danger uppercase tracking-wider">
                   Danger Zone
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Deleting this course will archive it if historical attendance sessions exist, or permanently remove it if unused.
+                  Permanently delete this course (only if no attendance sessions exist), or safely archive it.
                 </p>
               </div>
 
@@ -408,7 +546,7 @@ export default function EditCoursePage({
                 className="w-full h-11 flex items-center justify-center gap-2 rounded-xl border border-danger/30 bg-surface text-danger text-xs font-bold hover:bg-danger/10 active:scale-95 transition-all"
               >
                 <Trash2 className="h-4 w-4" />
-                <span>Delete or Archive Course</span>
+                <span>Delete Course</span>
               </button>
             </div>
           </div>
@@ -416,12 +554,27 @@ export default function EditCoursePage({
       </div>
 
       <ConfirmModal
+        isOpen={showArchiveModal}
+        onClose={() => setShowArchiveModal(false)}
+        onConfirm={handleToggleArchive}
+        title={course?.isArchived ? "Unarchive Course" : "Archive Course"}
+        description={
+          course?.isArchived
+            ? "Restore this course back to active status? It will appear on your active courses dashboard again."
+            : "Are you sure you want to archive this course? It will be marked as completed and hidden from your active list, but all attendance history and records will remain safely preserved."
+        }
+        confirmText={course?.isArchived ? "Restore Course" : "Archive Course"}
+        confirmVariant="primary"
+        loading={archiving}
+      />
+
+      <ConfirmModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDeleteCourse}
         title="Delete Course"
         description="Are you sure you want to delete this course? If it has historical attendance sessions, it will be safely archived without losing past records."
-        confirmText="Delete / Archive Course"
+        confirmText="Delete Course"
         confirmVariant="danger"
         loading={deleting}
       />
