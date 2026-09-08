@@ -25,19 +25,19 @@ enum AttendanceStatus {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  username     String    @unique
+  id           String   @id @default(cuid())
+  username     String   @unique
   passwordHash String
-  role         Role      @default(USER)
+  role         Role     @default(USER)
   fullName     String?
   designation  String?
   department   String?
   email        String?
   mobileNumber String?
   createdById  String?
-  createdBy    User?     @relation("TeacherManagers", fields: [createdById], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdBy    User?    @relation("TeacherManagers", fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   managedUsers   User[]          @relation("TeacherManagers")
   groups         Group[]
@@ -128,14 +128,14 @@ model AttendanceSession {
 }
 
 model AttendanceRecord {
-  id        String           @id @default(cuid())
+  id        String            @id @default(cuid())
   sessionId String
   session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   studentId String
-  student   Student          @relation(fields: [studentId], references: [id])
-  status    AttendanceStatus @default(SKIPPED)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  student   Student           @relation(fields: [studentId], references: [id])
+  status    AttendanceStatus  @default(SKIPPED)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   @@unique([sessionId, studentId])
 }
