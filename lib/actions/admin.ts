@@ -24,6 +24,7 @@ export async function getUsersAction() {
           select: {
             groups: true,
             courses: true,
+            courseManagers: true,
           },
         },
       },
@@ -39,7 +40,7 @@ export async function getUsersAction() {
 export async function createUserAction(formData: {
   username: string;
   password: string;
-  role?: "ADMIN" | "USER";
+  role?: "ADMIN" | "USER" | "MANAGER";
   fullName?: string;
   designation?: string;
   department?: string;
@@ -115,7 +116,7 @@ export async function updateUserAction(
     department?: string;
     email?: string;
     mobileNumber?: string;
-    role?: "ADMIN" | "USER";
+    role?: "ADMIN" | "USER" | "MANAGER";
   }
 ) {
   await requireAdmin();

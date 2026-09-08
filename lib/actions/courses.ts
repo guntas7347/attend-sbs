@@ -96,6 +96,7 @@ export async function getCoursesAction() {
             select: {
               id: true,
               username: true,
+              fullName: true,
             },
           },
         },
@@ -215,6 +216,7 @@ export async function getCourseByIdAction(id: string) {
             select: {
               id: true,
               username: true,
+              fullName: true,
             },
           },
         },

@@ -57,6 +57,9 @@ export async function getTeacherManagersAction() {
       select: {
         id: true,
         username: true,
+        fullName: true,
+        designation: true,
+        department: true,
         createdAt: true,
         createdById: true,
         createdBy: {
@@ -90,6 +93,9 @@ export async function getTeacherManagersAction() {
       return {
         id: m.id,
         username: m.username,
+        fullName: m.fullName,
+        designation: m.designation,
+        department: m.department,
         createdAt: m.createdAt,
         isOwner: session.role === "ADMIN" || m.createdById === session.userId,
         createdByUsername: m.createdBy?.username || null,

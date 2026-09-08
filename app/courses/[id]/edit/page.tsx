@@ -341,17 +341,35 @@ export default function EditCoursePage({
                           {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-foreground font-mono">
-                              @{mgr.username}
-                            </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {mgr.fullName ? (
+                              <>
+                                <span className="text-sm font-semibold text-foreground">
+                                  {mgr.fullName}
+                                </span>
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  (@{mgr.username})
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-sm font-bold text-foreground font-mono">
+                                @{mgr.username}
+                              </span>
+                            )}
                             <span className="text-[10px] rounded bg-secondary px-2 py-0.5 text-muted-foreground font-medium">
                               {mgr.assignedCourseCount} active courses
                             </span>
                           </div>
+                          {(mgr.department || mgr.designation) && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                              {mgr.designation && <span>{mgr.designation}</span>}
+                              {mgr.designation && mgr.department && <span> • </span>}
+                              {mgr.department && <span>{mgr.department}</span>}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <UserCheck className="h-4 w-4 text-muted-foreground" />
+                      <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
                     </button>
                   );
                 })}

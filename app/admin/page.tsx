@@ -51,13 +51,13 @@ export default function AdminUsersPage() {
     department: "",
     email: "",
     mobileNumber: "",
-    role: "USER" as "ADMIN" | "USER",
+    role: "USER" as "ADMIN" | "USER" | "MANAGER",
   });
 
   const { values, handleChange, resetForm } = useForm({
     username: "",
     password: "",
-    role: "USER" as "ADMIN" | "USER",
+    role: "USER" as "ADMIN" | "USER" | "MANAGER",
     fullName: "",
     designation: "",
     department: "",
@@ -275,6 +275,7 @@ export default function AdminUsersPage() {
                 className="w-full h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               >
                 <option value="USER">USER (Teacher / Operator)</option>
+                <option value="MANAGER">MANAGER (Course Manager / CR)</option>
                 <option value="ADMIN">ADMIN (Full Administrative Access)</option>
               </select>
             </div>
@@ -416,6 +417,8 @@ export default function AdminUsersPage() {
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                             u.role === "ADMIN"
                               ? "bg-accent/15 text-accent"
+                              : u.role === "MANAGER"
+                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                               : "bg-secondary text-muted-foreground"
                           }`}
                         >
@@ -477,8 +480,14 @@ export default function AdminUsersPage() {
                   </div>
                   {u._count && (
                     <div className="flex items-center gap-2">
-                      <span>• {u._count.courses || 0} courses</span>
-                      <span>• {u._count.groups || 0} groups</span>
+                      {u.role === "MANAGER" ? (
+                        <span>• {u._count.courseManagers || 0} assigned courses</span>
+                      ) : (
+                        <>
+                          <span>• {u._count.courses || 0} courses</span>
+                          <span>• {u._count.groups || 0} groups</span>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -622,6 +631,7 @@ export default function AdminUsersPage() {
                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   >
                     <option value="USER">USER</option>
+                    <option value="MANAGER">MANAGER</option>
                     <option value="ADMIN">ADMIN</option>
                   </select>
                 </div>

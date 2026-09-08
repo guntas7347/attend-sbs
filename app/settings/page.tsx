@@ -533,10 +533,21 @@ export default function SettingsPage() {
                   className="rounded-xl border border-border bg-background/70 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
                 >
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-sm text-foreground bg-secondary px-2.5 py-0.5 rounded-md">
-                        @{mgr.username}
-                      </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {mgr.fullName ? (
+                        <>
+                          <span className="text-sm font-bold text-foreground">
+                            {mgr.fullName}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">
+                            @{mgr.username}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="font-mono font-bold text-sm text-foreground bg-secondary px-2.5 py-0.5 rounded-md">
+                          @{mgr.username}
+                        </span>
+                      )}
                       <span className="text-[11px] text-muted-foreground">
                         Created {new Date(mgr.createdAt).toLocaleDateString()}
                       </span>

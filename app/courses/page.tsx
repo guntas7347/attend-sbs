@@ -106,15 +106,22 @@ export default async function CoursesPage() {
 
                 {/* Teacher view: show assigned managers if any */}
                 {!isManager && course.assignedManagers && course.assignedManagers.length > 0 && (
-                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
                     <span className="font-semibold">Manager:</span>
                     <div className="flex flex-wrap gap-1">
                       {course.assignedManagers.map((m: any) => (
                         <span
                           key={m.id}
-                          className="font-mono bg-accent/10 text-accent font-semibold px-1.5 py-0.5 rounded text-[10px]"
+                          className="bg-accent/10 text-accent font-medium px-2 py-0.5 rounded text-[11px] flex items-center gap-1"
                         >
-                          @{m.username}
+                          {m.fullName ? (
+                            <>
+                              <span className="font-semibold">{m.fullName}</span>
+                              <span className="font-mono text-[10px] opacity-80">(@{m.username})</span>
+                            </>
+                          ) : (
+                            <span className="font-mono font-semibold">@{m.username}</span>
+                          )}
                         </span>
                       ))}
                     </div>
