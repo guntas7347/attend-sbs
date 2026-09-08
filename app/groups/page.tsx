@@ -11,6 +11,9 @@ export default async function GroupsPage() {
   if (!result.success && result.error === "UNAUTHORIZED") {
     redirect("/login");
   }
+  if (!result.success && result.error === "FORBIDDEN") {
+    redirect("/courses");
+  }
   const groups = result.groups || [];
 
   return (

@@ -56,6 +56,7 @@ export const ModelName = {
   Student: 'Student',
   Course: 'Course',
   CourseGroup: 'CourseGroup',
+  CourseManager: 'CourseManager',
   AttendanceSession: 'AttendanceSession',
   AttendanceRecord: 'AttendanceRecord'
 } as const
@@ -86,6 +87,7 @@ export const UserScalarFieldEnum = {
   department: 'department',
   email: 'email',
   mobileNumber: 'mobileNumber',
+  createdById: 'createdById',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -145,6 +147,16 @@ export const CourseGroupScalarFieldEnum = {
 } as const
 
 export type CourseGroupScalarFieldEnum = (typeof CourseGroupScalarFieldEnum)[keyof typeof CourseGroupScalarFieldEnum]
+
+
+export const CourseManagerScalarFieldEnum = {
+  id: 'id',
+  courseId: 'courseId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type CourseManagerScalarFieldEnum = (typeof CourseManagerScalarFieldEnum)[keyof typeof CourseManagerScalarFieldEnum]
 
 
 export const AttendanceSessionScalarFieldEnum = {

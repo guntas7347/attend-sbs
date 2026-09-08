@@ -6,7 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "attend-sbs-fallback-secret-2026";
 
 export interface SessionUser {
   userId: string;
-  role: "ADMIN" | "USER";
+  role: "ADMIN" | "USER" | "MANAGER";
   username: string;
 }
 
@@ -53,6 +53,14 @@ export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) {
     throw new Error("UNAUTHORIZED");
+  }
+  return user;
+}
+
+export async function requireNonManager(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (user.role === "MANAGER") {
+    throw new Error("FORBIDDEN");
   }
   return user;
 }

@@ -67,6 +67,11 @@ export type Course = Prisma.CourseModel
  */
 export type CourseGroup = Prisma.CourseGroupModel
 /**
+ * Model CourseManager
+ * 
+ */
+export type CourseManager = Prisma.CourseManagerModel
+/**
  * Model AttendanceSession
  * 
  */

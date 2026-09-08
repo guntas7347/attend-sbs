@@ -92,6 +92,10 @@ export async function updateUserProfileAction(data: {
 }) {
   const session = await requireUser();
 
+  if (session.role === "MANAGER") {
+    return { success: false, error: "Managers are not permitted to edit profile settings" };
+  }
+
   try {
     const updated = await prisma.user.update({
       where: { id: session.userId },
@@ -117,6 +121,14 @@ export async function changePasswordAction(data: {
   confirmPassword: string;
 }) {
   const session = await requireUser();
+
+  if (session.role === "MANAGER") {
+    return {
+      success: false,
+      error: "Managers cannot change their own password. Please contact the course teacher.",
+    };
+  }
+
   const { currentPassword, newPassword, confirmPassword } = data;
 
   if (!currentPassword || !newPassword || !confirmPassword) {

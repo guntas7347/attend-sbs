@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import TopHeader from "@/components/TopHeader";
 import {
   getCoursePastAttendanceAction,
@@ -29,6 +30,7 @@ export default function CourseHistoryPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: courseId } = use(params);
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<"history" | "report">("history");
 
@@ -37,6 +39,7 @@ export default function CourseHistoryPage({
   const [sessions, setSessions] = useState<any[]>([]);
   const [filterDate, setFilterDate] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [isManager, setIsManager] = useState(false);
 
   // Report Tab States
   const [fromDate, setFromDate] = useState("");
@@ -71,9 +74,15 @@ export default function CourseHistoryPage({
       setLoadingHistory(true);
       try {
         const res = await getCoursePastAttendanceAction(courseId, filterDate);
-        if (res.success) {
+        if (!res.success) {
+          if (res.error === "Course not assigned to you" || res.error === "Course not found") {
+            router.replace("/courses");
+            return;
+          }
+        } else {
           setCourse(res.course);
           setSessions(res.sessions || []);
+          setIsManager(res.isManager || false);
         }
       } catch (e) {
         console.error("Failed to load history", e);
@@ -82,11 +91,11 @@ export default function CourseHistoryPage({
       }
     }
     load();
-  }, [courseId, filterDate]);
+  }, [courseId, filterDate, router]);
 
   // Load Attendance Report
   useEffect(() => {
-    if (activeTab !== "report") return;
+    if (activeTab !== "report" || isManager) return;
 
     async function loadReport() {
       setLoadingReport(true);
@@ -206,41 +215,53 @@ export default function CourseHistoryPage({
         backHref="/courses"
       />
 
-      {/* Navigation View Switcher Tabs */}
-      <div className="px-4 pt-3">
-        <div className="grid grid-cols-2 rounded-xl bg-secondary p-1 border border-border">
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className={`flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${
-              activeTab === "history"
-                ? "bg-surface text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <History className="h-4 w-4" />
-            <span>Sessions History</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("report")}
-            className={`flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${
-              activeTab === "report"
-                ? "bg-surface text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <BarChart3 className="h-4 w-4" />
-            <span>Attendance Report</span>
-          </button>
+      {/* Navigation View Switcher Tabs (Teachers only) */}
+      {!isManager && (
+        <div className="px-4 pt-3">
+          <div className="grid grid-cols-2 rounded-xl bg-secondary p-1 border border-border">
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              className={`flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${
+                activeTab === "history"
+                  ? "bg-surface text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <History className="h-4 w-4" />
+              <span>Sessions History</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("report")}
+              className={`flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${
+                activeTab === "report"
+                  ? "bg-surface text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span>Attendance Report</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content Body */}
       <div className="flex-1 p-4 space-y-4">
         {/* ================= HISTORY TAB ================= */}
         {activeTab === "history" && (
           <div className="space-y-4">
+            {/* Manager 2-Day Info Banner */}
+            {isManager && (
+              <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 flex items-center gap-2.5 text-xs text-foreground">
+                <Clock className="h-4 w-4 text-accent shrink-0" />
+                <p className="text-muted-foreground">
+                  Showing past attendance sessions from the <strong className="text-foreground">last 2 days</strong>.
+                </p>
+              </div>
+            )}
+
             {/* Date Filter Input */}
             <div className="relative flex items-center">
               <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground" />

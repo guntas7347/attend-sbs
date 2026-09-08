@@ -402,6 +402,7 @@ export const ModelName = {
   Student: 'Student',
   Course: 'Course',
   CourseGroup: 'CourseGroup',
+  CourseManager: 'CourseManager',
   AttendanceSession: 'AttendanceSession',
   AttendanceRecord: 'AttendanceRecord'
 } as const
@@ -419,7 +420,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "group" | "student" | "course" | "courseGroup" | "attendanceSession" | "attendanceRecord"
+    modelProps: "user" | "group" | "student" | "course" | "courseGroup" | "courseManager" | "attendanceSession" | "attendanceRecord"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -793,6 +794,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    CourseManager: {
+      payload: Prisma.$CourseManagerPayload<ExtArgs>
+      fields: Prisma.CourseManagerFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CourseManagerFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CourseManagerFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>
+        }
+        findFirst: {
+          args: Prisma.CourseManagerFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CourseManagerFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>
+        }
+        findMany: {
+          args: Prisma.CourseManagerFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>[]
+        }
+        create: {
+          args: Prisma.CourseManagerCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>
+        }
+        createMany: {
+          args: Prisma.CourseManagerCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CourseManagerCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>[]
+        }
+        delete: {
+          args: Prisma.CourseManagerDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>
+        }
+        update: {
+          args: Prisma.CourseManagerUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>
+        }
+        deleteMany: {
+          args: Prisma.CourseManagerDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CourseManagerUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CourseManagerUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>[]
+        }
+        upsert: {
+          args: Prisma.CourseManagerUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourseManagerPayload>
+        }
+        aggregate: {
+          args: Prisma.CourseManagerAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCourseManager>
+        }
+        groupBy: {
+          args: Prisma.CourseManagerGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CourseManagerGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CourseManagerCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CourseManagerCountAggregateOutputType> | number
+        }
+      }
+    }
     AttendanceSession: {
       payload: Prisma.$AttendanceSessionPayload<ExtArgs>
       fields: Prisma.AttendanceSessionFieldRefs
@@ -990,6 +1065,7 @@ export const UserScalarFieldEnum = {
   department: 'department',
   email: 'email',
   mobileNumber: 'mobileNumber',
+  createdById: 'createdById',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1049,6 +1125,16 @@ export const CourseGroupScalarFieldEnum = {
 } as const
 
 export type CourseGroupScalarFieldEnum = (typeof CourseGroupScalarFieldEnum)[keyof typeof CourseGroupScalarFieldEnum]
+
+
+export const CourseManagerScalarFieldEnum = {
+  id: 'id',
+  courseId: 'courseId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type CourseManagerScalarFieldEnum = (typeof CourseManagerScalarFieldEnum)[keyof typeof CourseManagerScalarFieldEnum]
 
 
 export const AttendanceSessionScalarFieldEnum = {
@@ -1352,6 +1438,7 @@ export type GlobalOmitConfig = {
   student?: Prisma.StudentOmit
   course?: Prisma.CourseOmit
   courseGroup?: Prisma.CourseGroupOmit
+  courseManager?: Prisma.CourseManagerOmit
   attendanceSession?: Prisma.AttendanceSessionOmit
   attendanceRecord?: Prisma.AttendanceRecordOmit
 }

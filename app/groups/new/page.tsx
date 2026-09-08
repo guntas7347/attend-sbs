@@ -1,16 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopHeader from "@/components/TopHeader";
 import { useForm } from "@/hooks/useForm";
 import { createGroupAction } from "@/lib/actions/groups";
+import { getCurrentUserAction } from "@/lib/actions/auth";
 import { Loader2 } from "lucide-react";
 
 export default function NewGroupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function checkRole() {
+      const user = await getCurrentUserAction();
+      if (!user) {
+        router.replace("/login");
+      } else if (user.role === "MANAGER") {
+        router.replace("/courses");
+      }
+    }
+    checkRole();
+  }, [router]);
 
   const { values, handleChange } = useForm({
     name: "",

@@ -10,6 +10,65 @@ export async function getCoursesAction() {
     return { success: false, error: "UNAUTHORIZED", courses: [] };
   }
 
+  // If user is a MANAGER, find courses explicitly assigned to this manager
+  if (session.role === "MANAGER") {
+    const courses = await prisma.course.findMany({
+      where: {
+        isArchived: false,
+        courseManagers: {
+          some: {
+            userId: session.userId,
+          },
+        },
+      },
+      include: {
+        courseGroups: {
+          include: {
+            group: {
+              include: {
+                _count: {
+                  select: {
+                    students: {
+                      where: { isArchived: false },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        sessions: {
+          orderBy: { date: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            date: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const coursesWithStudentCounts = courses.map((course) => {
+      const totalStudents = course.courseGroups.reduce(
+        (acc, cg) => acc + (cg.group._count.students || 0),
+        0
+      );
+
+      return {
+        ...course,
+        totalStudents,
+        isOwner: false,
+        isManager: true,
+        assignedManagers: [],
+      };
+    });
+
+    return { success: true, courses: coursesWithStudentCounts, role: "MANAGER" };
+  }
+
+  // For TEACHER (USER) or ADMIN
   const courses = await prisma.course.findMany({
     where: {
       isArchived: false,
@@ -27,6 +86,16 @@ export async function getCoursesAction() {
                   },
                 },
               },
+            },
+          },
+        },
+      },
+      courseManagers: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
             },
           },
         },
@@ -53,18 +122,73 @@ export async function getCoursesAction() {
     const isOwner =
       session.role === "ADMIN" || course.createdById === session.userId;
 
+    const assignedManagers = course.courseManagers.map((cm) => cm.user);
+
     return {
       ...course,
       totalStudents,
       isOwner,
+      isManager: false,
+      assignedManagers,
     };
   });
 
-  return { success: true, courses: coursesWithStudentCounts };
+  return { success: true, courses: coursesWithStudentCounts, role: session.role };
 }
 
 export async function getCourseByIdAction(id: string) {
   const session = await requireUser();
+
+  if (session.role === "MANAGER") {
+    const course = await prisma.course.findFirst({
+      where: {
+        id,
+        isArchived: false,
+        courseManagers: {
+          some: {
+            userId: session.userId,
+          },
+        },
+      },
+      include: {
+        courseGroups: {
+          include: {
+            group: {
+              include: {
+                students: {
+                  where: { isArchived: false },
+                  orderBy: { rollNumber: "asc" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!course) {
+      return { success: false, error: "Course not found or not assigned to you" };
+    }
+
+    const allStudents = course.courseGroups.flatMap((cg) =>
+      cg.group.students.map((student) => ({
+        ...student,
+        groupName: cg.group.name,
+      }))
+    );
+
+    return {
+      success: true,
+      course: {
+        ...course,
+        allStudents,
+        totalStudents: allStudents.length,
+        isOwner: false,
+        isManager: true,
+        assignedManagers: [],
+      },
+    };
+  }
 
   const course = await prisma.course.findFirst({
     where: {
@@ -81,6 +205,16 @@ export async function getCourseByIdAction(id: string) {
                 where: { isArchived: false },
                 orderBy: { rollNumber: "asc" },
               },
+            },
+          },
+        },
+      },
+      courseManagers: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
             },
           },
         },
@@ -103,6 +237,8 @@ export async function getCourseByIdAction(id: string) {
   const isOwner =
     session.role === "ADMIN" || course.createdById === session.userId;
 
+  const assignedManagers = course.courseManagers.map((cm) => cm.user);
+
   return {
     success: true,
     course: {
@@ -110,6 +246,8 @@ export async function getCourseByIdAction(id: string) {
       allStudents,
       totalStudents: allStudents.length,
       isOwner,
+      isManager: false,
+      assignedManagers,
     },
   };
 }
@@ -118,11 +256,17 @@ export async function createCourseAction(data: {
   name: string;
   code?: string;
   groupIds: string[];
+  managerIds?: string[];
 }) {
   const session = await requireUser();
+  if (session.role === "MANAGER") {
+    return { success: false, error: "Managers cannot create courses" };
+  }
+
   const name = data.name?.trim();
   const code = data.code?.trim() || null;
   const groupIds = data.groupIds || [];
+  const managerIds = data.managerIds || [];
 
   if (!name) {
     return { success: false, error: "Course name is required" };
@@ -143,6 +287,11 @@ export async function createCourseAction(data: {
             groupId,
           })),
         },
+        courseManagers: {
+          create: managerIds.map((userId) => ({
+            userId,
+          })),
+        },
       },
     });
 
@@ -160,12 +309,18 @@ export async function updateCourseAction(
     name: string;
     code?: string;
     groupIds: string[];
+    managerIds?: string[];
   }
 ) {
   const session = await requireUser();
+  if (session.role === "MANAGER") {
+    return { success: false, error: "Managers cannot edit courses" };
+  }
+
   const name = data.name?.trim();
   const code = data.code?.trim() || null;
   const groupIds = data.groupIds || [];
+  const managerIds = data.managerIds || [];
 
   if (!name) {
     return { success: false, error: "Course name is required" };
@@ -191,7 +346,7 @@ export async function updateCourseAction(
       };
     }
 
-    // Update course details and update assigned courseGroups transactionally
+    // Update course details, courseGroups, and courseManagers transactionally
     await prisma.$transaction(async (tx) => {
       await tx.course.update({
         where: { id: courseId },
@@ -210,6 +365,20 @@ export async function updateCourseAction(
           groupId,
         })),
       });
+
+      // Update course managers
+      await tx.courseManager.deleteMany({
+        where: { courseId },
+      });
+
+      if (managerIds.length > 0) {
+        await tx.courseManager.createMany({
+          data: managerIds.map((userId) => ({
+            courseId,
+            userId,
+          })),
+        });
+      }
     });
 
     revalidatePath(`/courses/${courseId}`);
@@ -223,6 +392,9 @@ export async function updateCourseAction(
 
 export async function deleteCourseAction(courseId: string) {
   const session = await requireUser();
+  if (session.role === "MANAGER") {
+    return { success: false, error: "Managers cannot delete courses" };
+  }
 
   try {
     const course = await prisma.course.findFirst({
@@ -267,6 +439,10 @@ export async function deleteCourseAction(courseId: string) {
         where: { courseId },
       });
 
+      await prisma.courseManager.deleteMany({
+        where: { courseId },
+      });
+
       await prisma.course.delete({
         where: { id: courseId },
       });
@@ -291,26 +467,71 @@ export async function getCoursePastAttendanceAction(
   const session = await requireUser();
 
   try {
-    const course = await prisma.course.findFirst({
-      where: {
-        id: courseId,
-        ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
-      },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        createdById: true,
-      },
-    });
+    let course: { id: string; name: string; code: string | null; createdById: string } | null = null;
+    let isManager = false;
+
+    if (session.role === "MANAGER") {
+      const assignment = await prisma.courseManager.findUnique({
+        where: {
+          courseId_userId: {
+            courseId,
+            userId: session.userId,
+          },
+        },
+      });
+
+      if (!assignment) {
+        return { success: false, error: "Course not assigned to you" };
+      }
+
+      course = await prisma.course.findFirst({
+        where: {
+          id: courseId,
+          isArchived: false,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          createdById: true,
+        },
+      });
+      isManager = true;
+    } else {
+      course = await prisma.course.findFirst({
+        where: {
+          id: courseId,
+          ...(session.role === "ADMIN" ? {} : { createdById: session.userId }),
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          createdById: true,
+        },
+      });
+    }
 
     if (!course) {
       return { success: false, error: "Course not found" };
     }
 
+    // If manager, restrict sessions to past 2 days
+    let dateFilter: any = undefined;
+    if (isManager) {
+      const now = new Date();
+      const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 0, 0, 0, 0);
+      const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59, 999);
+      dateFilter = {
+        gte: minDate,
+        lte: maxDate,
+      };
+    }
+
     const sessions = await prisma.attendanceSession.findMany({
       where: {
         courseId,
+        ...(dateFilter ? { date: dateFilter } : {}),
       },
       include: {
         records: {
@@ -355,6 +576,7 @@ export async function getCoursePastAttendanceAction(
       course,
       sessions: sessionsWithCounts,
       isOwner: session.role === "ADMIN" || course.createdById === session.userId,
+      isManager,
     };
   } catch (err: any) {
     console.error("Get past attendance error:", err);
@@ -368,6 +590,9 @@ export async function getCourseAttendanceReportAction(
   toDate?: string
 ) {
   const session = await requireUser();
+  if (session.role === "MANAGER") {
+    return { success: false, error: "Managers cannot access attendance reports" };
+  }
 
   try {
     const course = await prisma.course.findFirst({

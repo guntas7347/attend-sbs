@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import TopHeader from "@/components/TopHeader";
 import { useForm } from "@/hooks/useForm";
 import { useTheme } from "@/hooks/useTheme";
@@ -12,9 +13,17 @@ import {
   logoutAction,
 } from "@/lib/actions/auth";
 import {
+  getTeacherManagersAction,
+  createManagerAction,
+  resetManagerPasswordAction,
+} from "@/lib/actions/managers";
+import {
+  BookOpen,
   Briefcase,
   Building2,
+  Check,
   CheckCircle2,
+  Copy,
   Edit2,
   KeyRound,
   Loader2,
@@ -23,13 +32,19 @@ import {
   Mail,
   Moon,
   Phone,
+  Plus,
+  RotateCw,
   Shield,
   Sun,
   User,
+  UserCheck,
+  UserPlus,
+  Users,
   X,
 } from "lucide-react";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -50,11 +65,47 @@ export default function SettingsPage() {
     mobileNumber: "",
   });
 
+  // Managers State
+  const [managers, setManagers] = useState<any[]>([]);
+  const [loadingManagers, setLoadingManagers] = useState(false);
+
+  // Create Manager Modal State
+  const [showCreateManagerModal, setShowCreateManagerModal] = useState(false);
+  const [initialManagerPassword, setInitialManagerPassword] = useState("");
+  const [creatingManager, setCreatingManager] = useState(false);
+  const [createManagerError, setCreateManagerError] = useState<string | null>(null);
+  const [createdManagerResult, setCreatedManagerResult] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Reset Manager Password Modal State
+  const [managerToReset, setManagerToReset] = useState<any | null>(null);
+  const [newManagerPassword, setNewManagerPassword] = useState("");
+  const [resettingManagerPassword, setResettingManagerPassword] = useState(false);
+  const [resetManagerError, setResetManagerError] = useState<string | null>(null);
+  const [resetManagerSuccess, setResetManagerSuccess] = useState<string | null>(null);
+
   const { values, handleChange, resetForm } = useForm({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+
+  async function loadManagers() {
+    setLoadingManagers(true);
+    try {
+      const res = await getTeacherManagersAction();
+      if (res.success && res.managers) {
+        setManagers(res.managers);
+      }
+    } catch (e) {
+      console.error("Failed to load managers", e);
+    } finally {
+      setLoadingManagers(false);
+    }
+  }
 
   async function load() {
     try {
@@ -63,6 +114,12 @@ export default function SettingsPage() {
         window.location.href = "/login";
         return;
       }
+
+      if (user.role === "MANAGER") {
+        router.replace("/courses");
+        return;
+      }
+
       setCurrentUser(user);
       setProfileForm({
         fullName: user.fullName || "",
@@ -71,6 +128,8 @@ export default function SettingsPage() {
         email: user.email || "",
         mobileNumber: user.mobileNumber || "",
       });
+
+      await loadManagers();
     } catch (e) {
       console.error("Failed to load user", e);
     } finally {
@@ -123,6 +182,72 @@ export default function SettingsPage() {
     } finally {
       setSavingPassword(false);
     }
+  }
+
+  async function handleCreateManager(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateManagerError(null);
+    setCreatingManager(true);
+
+    try {
+      const res = await createManagerAction({
+        initialPassword: initialManagerPassword,
+      });
+
+      if (res.success && res.manager) {
+        setCreatedManagerResult({
+          username: res.manager.username,
+          password: initialManagerPassword,
+        });
+        setInitialManagerPassword("");
+        await loadManagers();
+      } else {
+        setCreateManagerError(res.error || "Failed to create manager account");
+      }
+    } catch {
+      setCreateManagerError("An unexpected network error occurred");
+    } finally {
+      setCreatingManager(false);
+    }
+  }
+
+  async function handleResetManagerPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!managerToReset) return;
+
+    setResetManagerError(null);
+    setResetManagerSuccess(null);
+    setResettingManagerPassword(true);
+
+    try {
+      const res = await resetManagerPasswordAction({
+        managerId: managerToReset.id,
+        newPassword: newManagerPassword,
+      });
+
+      if (res.success) {
+        setResetManagerSuccess(res.message || "Password updated successfully");
+        setNewManagerPassword("");
+        setTimeout(() => {
+          setManagerToReset(null);
+          setResetManagerSuccess(null);
+        }, 2000);
+      } else {
+        setResetManagerError(res.error || "Failed to reset manager password");
+      }
+    } catch {
+      setResetManagerError("An unexpected network error occurred");
+    } finally {
+      setResettingManagerPassword(false);
+    }
+  }
+
+  function copyCredentials() {
+    if (!createdManagerResult) return;
+    const text = `Username: ${createdManagerResult.username}\nPassword: ${createdManagerResult.password}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   if (loading) {
@@ -360,11 +485,111 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Course Managers Section (for Teachers and Admins) */}
+        <div className="rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-accent" />
+                <h3 className="text-sm font-bold text-foreground">Course Managers (CR Accounts)</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Transferable accounts (e.g. <span className="font-mono text-accent font-semibold">mgr-001</span>) for CRs to mark attendance.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateManagerModal(true);
+                setCreateManagerError(null);
+                setCreatedManagerResult(null);
+              }}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-bold hover:opacity-90 active:scale-95 transition-all self-start sm:self-auto shrink-0 shadow-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Create Manager</span>
+            </button>
+          </div>
+
+          {loadingManagers ? (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-accent" />
+              Loading manager accounts...
+            </div>
+          ) : managers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-background/50 p-6 text-center space-y-2">
+              <UserPlus className="h-8 w-8 text-muted-foreground mx-auto" />
+              <h4 className="text-xs font-semibold text-foreground">No Manager Accounts Created</h4>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Create a manager account such as <span className="font-mono font-bold">mgr-001</span> to delegate attendance marking to your Class Representatives.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {managers.map((mgr) => (
+                <div
+                  key={mgr.id}
+                  className="rounded-xl border border-border bg-background/70 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/40 transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm text-foreground bg-secondary px-2.5 py-0.5 rounded-md">
+                        @{mgr.username}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Created {new Date(mgr.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      <span className="text-[11px] font-semibold text-muted-foreground">
+                        Assigned Courses ({mgr.assignedCourseCount}):
+                      </span>
+                      {mgr.assignedCourses.length === 0 ? (
+                        <span className="text-[11px] text-muted-foreground italic">
+                          None (assign in Course Edit)
+                        </span>
+                      ) : (
+                        mgr.assignedCourses.map((c: any) => (
+                          <span
+                            key={c.id}
+                            className="rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] text-foreground font-medium"
+                          >
+                            {c.name}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {mgr.isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManagerToReset(mgr);
+                        setNewManagerPassword("");
+                        setResetManagerError(null);
+                        setResetManagerSuccess(null);
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-muted text-foreground text-xs font-semibold active:scale-95 transition-all self-end sm:self-auto shrink-0"
+                      title="Reset password to transfer to a new CR"
+                    >
+                      <KeyRound className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Change Password (Rotate CR)</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Change Password Form */}
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-xs space-y-4">
           <div className="flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-accent" />
-            <h3 className="text-sm font-bold text-foreground">Change Password</h3>
+            <h3 className="text-sm font-bold text-foreground">Change Personal Password</h3>
           </div>
 
           {passwordSuccess && (
@@ -453,6 +678,226 @@ export default function SettingsPage() {
           </form>
         </div>
       </div>
+
+      {/* Create Manager Modal */}
+      {showCreateManagerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/15 text-accent font-bold">
+                  <UserPlus className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Create Manager Account</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-generates sequential username (e.g. mgr-001)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateManagerModal(false)}
+                className="h-8 w-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {createManagerError && (
+              <div className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-xs font-medium text-danger">
+                {createManagerError}
+              </div>
+            )}
+
+            {createdManagerResult ? (
+              <div className="space-y-4 pt-1">
+                <div className="rounded-xl border border-success/30 bg-success/10 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-success font-bold text-xs">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Manager Account Created Successfully!</span>
+                  </div>
+
+                  <div className="rounded-lg bg-surface/90 border border-border p-3 space-y-1.5 font-mono text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Username:</span>
+                      <span className="font-bold text-accent text-sm">
+                        {createdManagerResult.username}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Password:</span>
+                      <span className="font-bold text-foreground text-sm">
+                        {createdManagerResult.password}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Copy and share these credentials with your CR. You can later assign this account to courses and reset its password whenever a new CR takes over.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={copyCredentials}
+                    className="flex-1 flex h-10 items-center justify-center gap-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-bold hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        <span>Copy Credentials</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateManagerModal(false)}
+                    className="px-4 h-10 rounded-xl border border-border bg-secondary text-xs font-semibold text-foreground hover:bg-muted"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateManager} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    Initial Password for Manager <span className="text-danger">*</span>
+                  </label>
+                  <div className="relative flex items-center">
+                    <Lock className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                    <input
+                      type="password"
+                      required
+                      value={initialManagerPassword}
+                      onChange={(e) => setInitialManagerPassword(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="w-full h-11 rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      autoFocus
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    The username will be assigned automatically (e.g. mgr-001).
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateManagerModal(false)}
+                    className="px-4 h-10 rounded-xl border border-border bg-secondary text-xs font-semibold text-foreground hover:bg-muted transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingManager || !initialManagerPassword}
+                    className="px-4 h-10 flex items-center justify-center gap-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {creatingManager ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Create Manager"
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Reset Manager Password Modal */}
+      {managerToReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500">
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Change Manager Password</h3>
+                  <p className="text-xs text-muted-foreground">
+                    For account: <span className="font-mono font-bold text-foreground">@{managerToReset.username}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManagerToReset(null)}
+                className="h-8 w-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {resetManagerSuccess && (
+              <div className="rounded-xl border border-success/20 bg-success/10 p-3 text-xs font-semibold text-success flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{resetManagerSuccess}</span>
+              </div>
+            )}
+
+            {resetManagerError && (
+              <div className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-xs font-medium text-danger">
+                {resetManagerError}
+              </div>
+            )}
+
+            <form onSubmit={handleResetManagerPassword} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  New Password for @{managerToReset.username} <span className="text-danger">*</span>
+                </label>
+                <div className="relative flex items-center">
+                  <Lock className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="password"
+                    required
+                    value={newManagerPassword}
+                    onChange={(e) => setNewManagerPassword(e.target.value)}
+                    placeholder="Enter new password (min 6 chars)"
+                    className="w-full h-11 rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Changing the password transfers this existing account to a new CR while preserving all existing course assignments.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setManagerToReset(null)}
+                  className="px-4 h-10 rounded-xl border border-border bg-secondary text-xs font-semibold text-foreground hover:bg-muted transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingManagerPassword || !newManagerPassword}
+                  className="px-4 h-10 flex items-center justify-center gap-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {resettingManagerPassword ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Confirm & Update"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

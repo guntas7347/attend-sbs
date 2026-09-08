@@ -81,6 +81,14 @@ export default function GroupDetailPage({
   async function loadGroup() {
     try {
       const res = await getGroupByIdAction(groupId);
+      if (res.error === "FORBIDDEN") {
+        router.replace("/courses");
+        return;
+      }
+      if (res.error === "UNAUTHORIZED") {
+        router.replace("/login");
+        return;
+      }
       if (res.success && res.group) {
         setGroup(res.group);
       } else {

@@ -42,8 +42,9 @@ export default function AttendanceReviewPage({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [isManager, setIsManager] = useState(false);
   const [filter, setFilter] = useState<"ALL" | "PRESENT" | "ABSENT" | "SKIPPED">("ALL");
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     async function load() {
@@ -52,6 +53,7 @@ export default function AttendanceReviewPage({
         if (res.success && res.session) {
           setSession(res.session);
           setRecords(res.records || []);
+          setIsManager(res.isManager || false);
         } else {
           setError(res.error || "Failed to load session details");
         }
@@ -86,7 +88,11 @@ export default function AttendanceReviewPage({
     try {
       const res = await completeAttendanceSessionAction(sessionId);
       if (res.success) {
-        router.push(`/courses/${res.courseId}/history`);
+        if (res.isManager || isManager) {
+          router.push("/courses");
+        } else {
+          router.push(`/courses/${res.courseId}/history`);
+        }
         router.refresh();
       } else {
         setError(res.error || "Failed to complete session");
@@ -161,15 +167,17 @@ export default function AttendanceReviewPage({
               <span className="text-xs font-mono font-bold text-foreground">
                 Total: {total}
               </span>
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(true)}
-                className="text-[11px] font-semibold text-danger hover:underline flex items-center gap-1"
-                title="Discard / Delete Session"
-              >
-                <Trash2 className="h-3 w-3" />
-                <span>Delete Session</span>
-              </button>
+              {!isManager && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(true)}
+                  className="text-[11px] font-semibold text-danger hover:underline flex items-center gap-1"
+                  title="Discard / Delete Session"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>Delete Session</span>
+                </button>
+              )}
             </div>
           </div>
 

@@ -12,7 +12,10 @@ import {
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   CheckCircle,
+  Copy,
+  Edit3,
   Loader2,
   Minus,
   Trash2,
@@ -31,6 +34,8 @@ export default function AttendanceViewSessionPage({
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isManager, setIsManager] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -42,6 +47,7 @@ export default function AttendanceViewSessionPage({
         if (res.success && res.session) {
           setSession(res.session);
           setRecords(res.records || []);
+          setIsManager(res.isManager || false);
         } else {
           setError(res.error || "Session not found");
         }
@@ -54,6 +60,50 @@ export default function AttendanceViewSessionPage({
     }
     load();
   }, [sessionId]);
+
+  async function handleCopyAttendance() {
+    if (!session) return;
+    const d = new Date(session.date);
+    const dateStr = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+
+    const presentRecords = records
+      .filter((r) => r.status === "PRESENT")
+      .sort((a, b) => {
+        const numA = parseInt(a.rollNumber, 10);
+        const numB = parseInt(b.rollNumber, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        return a.rollNumber.localeCompare(b.rollNumber, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+      });
+
+    const rollList =
+      presentRecords.length > 0
+        ? `${presentRecords.map((r) => r.rollNumber).join(", ")}.`
+        : "None.";
+
+    const text = `Attendance Log\nDate - ${dateStr}\nSubject - ${session.courseName}\nTotal Present - ${session.present}\nPresent Roll Numbers:\n${rollList}`;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy attendance log", err);
+    }
+  }
 
   async function handleDeleteSession() {
     setDeleting(true);
@@ -124,15 +174,17 @@ export default function AttendanceViewSessionPage({
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowDeleteModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-danger/20 bg-danger/5 text-danger text-xs font-semibold hover:bg-danger/10 active:scale-95 transition-all shrink-0"
-              title="Delete this session"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>Delete</span>
-            </button>
+            {!isManager && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-danger/20 bg-danger/5 text-danger text-xs font-semibold hover:bg-danger/10 active:scale-95 transition-all shrink-0"
+                title="Delete this session"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-2 text-center pt-1">
@@ -156,6 +208,37 @@ export default function AttendanceViewSessionPage({
                 SKIPPED
               </div>
             </div>
+          </div>
+
+          {/* Quick Actions (Copy Log & Edit Attendance) */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
+            <button
+              type="button"
+              onClick={handleCopyAttendance}
+              className="flex-1 flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-secondary text-foreground text-xs font-semibold hover:bg-muted active:scale-[0.98] transition-all"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-success" />
+                  <span className="text-success font-bold">Copied to Clipboard!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Copy Attendance Log</span>
+                </>
+              )}
+            </button>
+
+            {!isManager && (
+              <Link
+                href={`/attendance/${sessionId}/review`}
+                className="flex h-10 px-4 items-center justify-center gap-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-semibold hover:opacity-95 active:scale-[0.98] transition-all shadow-xs"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                <span>Edit</span>
+              </Link>
+            )}
           </div>
         </div>
 

@@ -21,8 +21,11 @@ export default function MarkAttendanceSetupPage({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Default to today in YYYY-MM-DD format
+  // Calculate min allowed date for managers (today - 2 days)
   const today = new Date().toISOString().split("T")[0];
+  const d = new Date();
+  d.setDate(d.getDate() - 2);
+  const twoDaysAgoStr = d.toISOString().split("T")[0];
 
   const { values, handleChange } = useForm({
     date: today,
@@ -141,6 +144,8 @@ export default function MarkAttendanceSetupPage({
               name="date"
               type="date"
               required
+              min={course?.isManager ? twoDaysAgoStr : undefined}
+              max={course?.isManager ? today : undefined}
               value={values.date}
               onChange={handleChange}
               className="w-full h-12 rounded-xl border border-border bg-surface px-4 text-sm text-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-all"

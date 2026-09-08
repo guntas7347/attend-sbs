@@ -10,6 +10,7 @@ datasource db {
 enum Role {
   ADMIN
   USER
+  MANAGER
 }
 
 enum SessionStatus {
@@ -33,11 +34,15 @@ model User {
   department   String?
   email        String?
   mobileNumber String?
+  createdById  String?
+  createdBy    User?     @relation("TeacherManagers", fields: [createdById], references: [id])
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  groups  Group[]
-  courses Course[]
+  managedUsers   User[]          @relation("TeacherManagers")
+  groups         Group[]
+  courses        Course[]
+  courseManagers CourseManager[]
 }
 
 model Group {
@@ -82,8 +87,9 @@ model Course {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  courseGroups CourseGroup[]
-  sessions     AttendanceSession[]
+  courseGroups   CourseGroup[]
+  courseManagers CourseManager[]
+  sessions       AttendanceSession[]
 }
 
 model CourseGroup {
@@ -95,6 +101,17 @@ model CourseGroup {
   createdAt DateTime @default(now())
 
   @@unique([courseId, groupId])
+}
+
+model CourseManager {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([courseId, userId])
 }
 
 model AttendanceSession {

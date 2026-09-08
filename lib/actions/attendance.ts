@@ -1,8 +1,43 @@
 "use server";
 
 import { prisma } from "../prisma";
-import { requireUser } from "../auth";
+import { requireUser, SessionUser } from "../auth";
 import { revalidatePath } from "next/cache";
+
+/**
+ * Server-side check for 2-day attendance window.
+ * Returns true if date is within today - 2 days and today + 1 day (for timezone tolerance).
+ */
+function isDateWithin2Days(targetDate: Date | string): boolean {
+  const target = new Date(targetDate);
+  const now = new Date();
+  const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 0, 0, 0, 0);
+  const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59, 999);
+  const t = target.getTime();
+  return t >= minDate.getTime() && t <= maxDate.getTime();
+}
+
+/**
+ * Verify user has permission to access a course.
+ */
+async function verifyCourseAccess(courseId: string, sessionUser: SessionUser): Promise<boolean> {
+  if (sessionUser.role === "ADMIN") return true;
+  if (sessionUser.role === "MANAGER") {
+    const cm = await prisma.courseManager.findUnique({
+      where: {
+        courseId_userId: {
+          courseId,
+          userId: sessionUser.userId,
+        },
+      },
+    });
+    return !!cm;
+  }
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, createdById: sessionUser.userId },
+  });
+  return !!course;
+}
 
 export async function getOrCreateSessionAction(
   courseId: string,
@@ -13,11 +48,28 @@ export async function getOrCreateSessionAction(
   const sessionUser = await requireUser();
 
   try {
+    const targetDate = dateStr ? new Date(dateStr) : new Date();
+
+    // Check manager date restriction
+    if (sessionUser.role === "MANAGER") {
+      if (!isDateWithin2Days(targetDate)) {
+        return {
+          success: false,
+          error: "Managers can only create or access attendance within the last 2 days.",
+        };
+      }
+    }
+
+    // Verify course access
+    const hasAccess = await verifyCourseAccess(courseId, sessionUser);
+    if (!hasAccess) {
+      return { success: false, error: "Course not found or you lack permission to access it" };
+    }
+
     const course = await prisma.course.findFirst({
       where: {
         id: courseId,
         isArchived: false,
-        ...(sessionUser.role === "ADMIN" ? {} : { createdById: sessionUser.userId }),
       },
       include: {
         courseGroups: {
@@ -36,21 +88,28 @@ export async function getOrCreateSessionAction(
     });
 
     if (!course) {
-      return { success: false, error: "Course not found" };
+      return { success: false, error: "Course not found or archived" };
     }
-
-    const targetDate = dateStr ? new Date(dateStr) : new Date();
 
     // Check if there is an existing in-progress session if forceNew is not set
     let attendanceSession = null;
     if (!forceNew) {
-      attendanceSession = await prisma.attendanceSession.findFirst({
+      const candidateSessions = await prisma.attendanceSession.findMany({
         where: {
           courseId,
           status: "IN_PROGRESS",
         },
         orderBy: { createdAt: "desc" },
       });
+
+      // If MANAGER, ensure resumed session date is within 2 days
+      for (const s of candidateSessions) {
+        if (sessionUser.role === "MANAGER" && !isDateWithin2Days(s.date)) {
+          continue;
+        }
+        attendanceSession = s;
+        break;
+      }
     }
 
     // If no unfinished session to resume, create a new one
@@ -110,7 +169,7 @@ export async function getOrCreateSessionAction(
 }
 
 export async function getSessionDetailsAction(sessionId: string) {
-  await requireUser();
+  const sessionUser = await requireUser();
 
   try {
     const session = await prisma.attendanceSession.findUnique({
@@ -148,6 +207,22 @@ export async function getSessionDetailsAction(sessionId: string) {
       return { success: false, error: "Attendance session not found" };
     }
 
+    // Check course permissions
+    const hasAccess = await verifyCourseAccess(session.courseId, sessionUser);
+    if (!hasAccess) {
+      return { success: false, error: "Unauthorized: Course not assigned to you" };
+    }
+
+    // Check manager 2-day restriction
+    if (sessionUser.role === "MANAGER") {
+      if (!isDateWithin2Days(session.date)) {
+        return {
+          success: false,
+          error: "Access denied: Attendance sessions older than 2 days are not accessible to managers",
+        };
+      }
+    }
+
     const records = session.records.map((r) => ({
       recordId: r.id,
       studentId: r.studentId,
@@ -172,6 +247,7 @@ export async function getSessionDetailsAction(sessionId: string) {
         createdAt: session.createdAt,
       },
       records,
+      isManager: sessionUser.role === "MANAGER",
     };
   } catch (err: any) {
     console.error("Get session details error:", err);
@@ -184,9 +260,39 @@ export async function saveAttendanceRecordAction(
   studentId: string,
   status: "PRESENT" | "ABSENT" | "SKIPPED"
 ) {
-  await requireUser();
+  const sessionUser = await requireUser();
 
   try {
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      return { success: false, error: "Attendance session not found" };
+    }
+
+    // Check access
+    const hasAccess = await verifyCourseAccess(session.courseId, sessionUser);
+    if (!hasAccess) {
+      return { success: false, error: "Unauthorized: Course not assigned to you" };
+    }
+
+    // Check manager restrictions
+    if (sessionUser.role === "MANAGER") {
+      if (!isDateWithin2Days(session.date)) {
+        return {
+          success: false,
+          error: "Managers cannot edit attendance older than 2 days",
+        };
+      }
+      if (session.status === "COMPLETED") {
+        return {
+          success: false,
+          error: "Managers cannot edit completed attendance sessions",
+        };
+      }
+    }
+
     await prisma.attendanceRecord.upsert({
       where: {
         sessionId_studentId: {
@@ -212,9 +318,33 @@ export async function saveAttendanceRecordAction(
 }
 
 export async function completeAttendanceSessionAction(sessionId: string) {
-  await requireUser();
+  const sessionUser = await requireUser();
 
   try {
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      return { success: false, error: "Attendance session not found" };
+    }
+
+    // Check access
+    const hasAccess = await verifyCourseAccess(session.courseId, sessionUser);
+    if (!hasAccess) {
+      return { success: false, error: "Unauthorized: Course not assigned to you" };
+    }
+
+    // Check manager 2-day restriction
+    if (sessionUser.role === "MANAGER") {
+      if (!isDateWithin2Days(session.date)) {
+        return {
+          success: false,
+          error: "Managers cannot complete attendance sessions older than 2 days",
+        };
+      }
+    }
+
     const updated = await prisma.attendanceSession.update({
       where: { id: sessionId },
       data: {
@@ -228,7 +358,7 @@ export async function completeAttendanceSessionAction(sessionId: string) {
     revalidatePath(`/attendance/${sessionId}`);
     revalidatePath(`/courses/${updated.courseId}/history`);
     revalidatePath("/courses");
-    return { success: true, courseId: updated.courseId };
+    return { success: true, courseId: updated.courseId, isManager: sessionUser.role === "MANAGER" };
   } catch (err: any) {
     console.error("Complete session error:", err);
     return { success: false, error: "Failed to complete attendance session" };
@@ -236,7 +366,7 @@ export async function completeAttendanceSessionAction(sessionId: string) {
 }
 
 export async function getSessionViewAction(sessionId: string) {
-  await requireUser();
+  const sessionUser = await requireUser();
 
   try {
     const session = await prisma.attendanceSession.findUnique({
@@ -264,6 +394,22 @@ export async function getSessionViewAction(sessionId: string) {
 
     if (!session) {
       return { success: false, error: "Session not found" };
+    }
+
+    // Check access
+    const hasAccess = await verifyCourseAccess(session.courseId, sessionUser);
+    if (!hasAccess) {
+      return { success: false, error: "Unauthorized: Course not assigned to you" };
+    }
+
+    // Check manager 2-day restriction
+    if (sessionUser.role === "MANAGER") {
+      if (!isDateWithin2Days(session.date)) {
+        return {
+          success: false,
+          error: "Managers cannot view attendance sessions older than 2 days",
+        };
+      }
     }
 
     const total = session.records.length;
@@ -295,6 +441,7 @@ export async function getSessionViewAction(sessionId: string) {
         groupName: r.student.group.name,
         status: r.status,
       })),
+      isManager: sessionUser.role === "MANAGER",
     };
   } catch (err: any) {
     console.error("Get session view error:", err);
@@ -304,6 +451,13 @@ export async function getSessionViewAction(sessionId: string) {
 
 export async function deleteAttendanceSessionAction(sessionId: string) {
   const sessionUser = await requireUser();
+
+  if (sessionUser.role === "MANAGER") {
+    return {
+      success: false,
+      error: "Managers are not permitted to delete attendance sessions",
+    };
+  }
 
   try {
     const session = await prisma.attendanceSession.findUnique({

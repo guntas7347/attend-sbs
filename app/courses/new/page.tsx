@@ -6,13 +6,16 @@ import TopHeader from "@/components/TopHeader";
 import { useForm } from "@/hooks/useForm";
 import { getGroupsAction } from "@/lib/actions/groups";
 import { createCourseAction } from "@/lib/actions/courses";
-import { BookOpen, Check, Loader2, Users } from "lucide-react";
+import { getTeacherManagersAction } from "@/lib/actions/managers";
+import { BookOpen, Check, Loader2, Shield, Users, UserCheck } from "lucide-react";
 import Link from "next/link";
 
 export default function NewCoursePage() {
   const router = useRouter();
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [managers, setManagers] = useState<any[]>([]);
+  const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,26 +26,46 @@ export default function NewCoursePage() {
   });
 
   useEffect(() => {
-    async function loadGroups() {
+    async function loadData() {
       try {
-        const res = await getGroupsAction();
-        if (res.success && res.groups) {
-          setGroups(res.groups);
+        const [groupsRes, managersRes] = await Promise.all([
+          getGroupsAction(),
+          getTeacherManagersAction(),
+        ]);
+
+        if (groupsRes.error === "FORBIDDEN" || managersRes.error === "FORBIDDEN") {
+          router.replace("/courses");
+          return;
+        }
+
+        if (groupsRes.success && groupsRes.groups) {
+          setGroups(groupsRes.groups);
+        }
+        if (managersRes.success && managersRes.managers) {
+          setManagers(managersRes.managers);
         }
       } catch {
-        setError("Failed to load groups");
+        setError("Failed to load course setup data");
       } finally {
         setFetching(false);
       }
     }
-    loadGroups();
-  }, []);
+    loadData();
+  }, [router]);
 
   function toggleGroup(groupId: string) {
     setSelectedGroups((prev) =>
       prev.includes(groupId)
         ? prev.filter((id) => id !== groupId)
         : [...prev, groupId]
+    );
+  }
+
+  function toggleManager(managerId: string) {
+    setSelectedManagers((prev) =>
+      prev.includes(managerId)
+        ? prev.filter((id) => id !== managerId)
+        : [...prev, managerId]
     );
   }
 
@@ -61,6 +84,7 @@ export default function NewCoursePage() {
         name: values.name,
         code: values.code,
         groupIds: selectedGroups,
+        managerIds: selectedManagers,
       });
 
       if (res.success) {
@@ -197,6 +221,78 @@ export default function NewCoursePage() {
                         <Users className="h-3 w-3" />
                         <span>{group._count.students}</span>
                       </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Manager Assignment */}
+          <div className="space-y-2 pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
+                  Assign Manager / CR <span className="text-muted-foreground font-normal">(Optional)</span>
+                </label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Assigned managers can log in with their transferable account to mark attendance.
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {selectedManagers.length} selected
+              </span>
+            </div>
+
+            {managers.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-surface p-3.5 text-center space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  No manager accounts created yet.
+                </p>
+                <Link
+                  href="/settings"
+                  className="inline-block text-xs font-semibold text-accent underline"
+                >
+                  Create manager account in Settings
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {managers.map((mgr) => {
+                  const isSelected = selectedManagers.includes(mgr.id);
+                  return (
+                    <button
+                      key={mgr.id}
+                      type="button"
+                      onClick={() => toggleManager(mgr.id)}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
+                        isSelected
+                          ? "border-accent bg-accent/5 ring-1 ring-accent"
+                          : "border-border bg-surface hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-5 w-5 items-center justify-center rounded-md border ${
+                            isSelected
+                              ? "bg-accent border-accent text-accent-foreground"
+                              : "border-muted-foreground/40 bg-background"
+                          }`}
+                        >
+                          {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-foreground font-mono">
+                              @{mgr.username}
+                            </span>
+                            <span className="text-[10px] rounded bg-secondary px-2 py-0.5 text-muted-foreground font-medium">
+                              {mgr.assignedCourseCount} active courses
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <UserCheck className="h-4 w-4 text-muted-foreground" />
                     </button>
                   );
                 })}

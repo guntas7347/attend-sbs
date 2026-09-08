@@ -1,13 +1,17 @@
 "use server";
 
 import { prisma } from "../prisma";
-import { getSessionUser, requireUser } from "../auth";
+import { getSessionUser, requireUser, requireNonManager } from "../auth";
 import { revalidatePath } from "next/cache";
 
 export async function getGroupsAction() {
   const session = await getSessionUser();
   if (!session) {
     return { success: false, error: "UNAUTHORIZED", groups: [] };
+  }
+
+  if (session.role === "MANAGER") {
+    return { success: false, error: "FORBIDDEN", groups: [] };
   }
 
   const groups = await prisma.group.findMany({
@@ -41,7 +45,7 @@ export async function getGroupsAction() {
 }
 
 export async function getGroupByIdAction(id: string) {
-  const session = await requireUser();
+  const session = await requireNonManager();
 
   const group = await prisma.group.findFirst({
     where: {
@@ -85,7 +89,7 @@ export async function getGroupByIdAction(id: string) {
 }
 
 export async function createGroupAction(data: { name: string; detail?: string }) {
-  const session = await requireUser();
+  const session = await requireNonManager();
   const name = data.name?.trim();
   const detail = data.detail?.trim() || null;
 
@@ -114,7 +118,7 @@ export async function updateGroupAction(
   id: string,
   data: { name: string; detail?: string }
 ) {
-  const session = await requireUser();
+  const session = await requireNonManager();
   const name = data.name?.trim();
   const detail = data.detail?.trim() || null;
 
@@ -153,7 +157,7 @@ export async function updateGroupAction(
 }
 
 export async function deleteGroupAction(groupId: string) {
-  const session = await requireUser();
+  const session = await requireNonManager();
 
   try {
     const group = await prisma.group.findFirst({
@@ -245,7 +249,7 @@ export async function addStudentAction(
     image?: string;
   }
 ) {
-  const session = await requireUser();
+  const session = await requireNonManager();
   const name = studentData.name?.trim();
   const rollNumber = studentData.rollNumber?.trim();
   const fatherName = studentData.fatherName?.trim() || null;
@@ -313,7 +317,7 @@ export async function updateStudentAction(
     fatherName?: string;
   }
 ) {
-  const session = await requireUser();
+  const session = await requireNonManager();
   const name = studentData.name?.trim();
   const rollNumber = studentData.rollNumber?.trim();
   const fatherName = studentData.fatherName?.trim() || null;
@@ -374,7 +378,7 @@ export async function updateStudentAction(
 }
 
 export async function removeStudentAction(studentId: string) {
-  const session = await requireUser();
+  const session = await requireNonManager();
 
   try {
     const student = await prisma.student.findUnique({
@@ -443,7 +447,7 @@ export async function importStudentsAction(
     image?: string;
   }>
 ) {
-  const session = await requireUser();
+  const session = await requireNonManager();
 
   if (!students || students.length === 0) {
     return { success: false, error: "No student data provided" };
